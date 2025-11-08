@@ -83,11 +83,42 @@ jobs:
         run: |
           pip install -r requirements.txt
       
-      - name: Run backend tests
+      - name: Wait for PostgreSQL
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          until pg_isready -h localhost -p 5432 -U test_user; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+      
+      - name: Run database migrations
         working-directory: ./backend
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost/test_sentinal
-        run: pytest || true
+          SECRET_KEY: test_secret_key_32_characters_long
+          JWT_SECRET_KEY: test_jwt_secret_key_32_characters_long
+          FLASK_ENV: testing
+        run: |
+          flask db upgrade || echo "No migrations to run"
+      
+      - name: Run backend tests with coverage
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost/test_sentinal
+          TEST_DATABASE_URL: postgresql://test_user:test_password@localhost/test_sentinal
+          SECRET_KEY: test_secret_key_32_characters_long
+          JWT_SECRET_KEY: test_jwt_secret_key_32_characters_long
+          FLASK_ENV: testing
+        run: |
+          pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml
+      
+      - name: Upload backend coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+        continue-on-error: true
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -98,9 +129,30 @@ jobs:
         working-directory: ./frontend
         run: npm ci
       
-      - name: Run frontend tests
+      - name: Check if frontend tests exist
+        id: check_frontend_tests
         working-directory: ./frontend
-        run: npm test -- --coverage || true
+        run: |
+          if grep -q '"test"' package.json; then
+            echo "tests_exist=true" >> $GITHUB_OUTPUT
+          else
+            echo "tests_exist=false" >> $GITHUB_OUTPUT
+            echo "No test script found in package.json, skipping frontend tests"
+          fi
+      
+      - name: Run frontend tests
+        if: steps.check_frontend_tests.outputs.tests_exist == 'true'
+        working-directory: ./frontend
+        run: npm test -- --coverage --watchAll=false
+      
+      - name: Upload frontend coverage
+        if: steps.check_frontend_tests.outputs.tests_exist == 'true'
+        uses: codecov/codecov-action@v3
+        with:
+          directory: ./frontend/coverage
+          flags: frontend
+          name: frontend-coverage
+        continue-on-error: true
 
   build:
     name: Build
@@ -130,14 +182,131 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  sast:
-    name: SAST Scan (SonarQube)
+  smoke-test:
+    name: Smoke Test
     runs-on: ubuntu-latest
     needs: [build]
     steps:
       - uses: actions/checkout@v4
       
+      - name: Create test environment file
+        run: |
+          cat > .docker.env << EOF
+          POSTGRES_USER=test_user
+          POSTGRES_PASSWORD=test_password_32_chars_long
+          POSTGRES_DB=test_sentinal
+          DATABASE_URL=postgresql://test_user:test_password_32_chars_long@postgres:5432/test_sentinal
+          SECRET_KEY=test_secret_key_32_characters_long
+          JWT_SECRET_KEY=test_jwt_secret_key_32_characters_long
+          FLASK_ENV=testing
+          GITHUB_CLIENT_ID=
+          GITHUB_CLIENT_SECRET=
+          SONARQUBE_TOKEN=
+          EOF
+      
+      - name: Start PostgreSQL
+        run: |
+          docker compose --env-file .docker.env up -d postgres
+          sleep 10
+      
+      - name: Start backend and frontend
+        run: |
+          docker compose --env-file .docker.env up -d backend frontend
+          sleep 20
+      
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for services to start..."
+          for i in {1..30}; do
+            if curl -f http://localhost/api/health 2>/dev/null; then
+              echo "✅ Backend is ready!"
+              break
+            fi
+            echo "Attempt $i/30: Waiting for backend..."
+            sleep 2
+          done
+      
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests..."
+          
+          # Test backend health endpoint
+          echo "Testing backend health endpoint..."
+          HEALTH_RESPONSE=$(curl -s http://localhost/api/health || echo "")
+          if echo "$HEALTH_RESPONSE" | grep -q "healthy"; then
+            echo "✅ Backend health check passed: $HEALTH_RESPONSE"
+          else
+            echo "❌ Backend health check failed"
+            exit 1
+          fi
+          
+          # Test backend API root (should return 200 with API info)
+          echo "Testing API root endpoint..."
+          API_RESPONSE=$(curl -s http://localhost/api/ || echo "")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/ || echo "000")
+          if [ "$STATUS" -ge 500 ]; then
+            echo "❌ API root returned 5xx error: $STATUS"
+            exit 1
+          fi
+          if echo "$API_RESPONSE" | grep -q "Project Sentinel"; then
+            echo "✅ API root responded correctly: $STATUS"
+          else
+            echo "⚠️ API root responded with status: $STATUS (may require auth)"
+          fi
+          
+          # Test frontend is serving
+          echo "Testing frontend..."
+          FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ || echo "000")
+          if [ "$FRONTEND_STATUS" -ge 500 ]; then
+            echo "❌ Frontend returned 5xx error: $FRONTEND_STATUS"
+            exit 1
+          fi
+          echo "✅ Frontend responded with status: $FRONTEND_STATUS"
+          
+          echo "✅ All smoke tests passed!"
+      
+      - name: Show service logs on failure
+        if: failure()
+        run: |
+          echo "=== Backend logs ==="
+          docker compose --env-file .docker.env logs backend || true
+          echo "=== Frontend logs ==="
+          docker compose --env-file .docker.env logs frontend || true
+          echo "=== PostgreSQL logs ==="
+          docker compose --env-file .docker.env logs postgres || true
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose --env-file .docker.env down -v || true
+
+  sast:
+    name: SAST Scan (SonarQube)
+    runs-on: ubuntu-latest
+    needs: [smoke-test]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check SonarQube configuration
+        id: check_sonar
+        run: |
+          if [ -z "${{ secrets.SONARQUBE_TOKEN }}" ] || [ -z "${{ secrets.SONARQUBE_URL }}" ]; then
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "⚠️ SonarQube secrets not configured. Skipping SAST scan."
+          else
+            echo "configured=true" >> $GITHUB_OUTPUT
+            # Validate URL format
+            URL="${{ secrets.SONARQUBE_URL }}"
+            if [[ ! "$URL" =~ ^https?:// ]]; then
+              echo "❌ SONARQUBE_URL must start with http:// or https://"
+              echo "Current value: $URL"
+              exit 1
+            fi
+            echo "✅ SonarQube URL format is valid"
+          fi
+      
       - name: SonarQube Scan
+        if: steps.check_sonar.outputs.configured == 'true'
         id: sonar
         uses: sonarsource/sonarqube-scan-action@master
         env:
@@ -145,8 +314,30 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONARQUBE_URL }}
         continue-on-error: true
       
+      - name: Skip SonarQube Scan
+        if: steps.check_sonar.outputs.configured == 'false'
+        run: |
+          echo "⚠️ SonarQube scan skipped - secrets not configured"
+          echo "To enable SonarQube scanning:"
+          echo "1. Set SONARQUBE_TOKEN secret in GitHub repository settings"
+          echo "2. Set SONARQUBE_URL secret"
+          echo "   - For SonarCloud: https://sonarcloud.io"
+          echo "   - For local SonarQube: Use ngrok (see README) or public URL"
+          echo "   - Example with ngrok: https://your-ngrok-url.ngrok.io"
+      
+      - name: Check Sentinal Dashboard configuration
+        id: check_dashboard
+        run: |
+          if [ -z "${{ secrets.SENTINAL_API_URL }}" ] || [ -z "${{ secrets.SENTINAL_API_TOKEN }}" ]; then
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Sentinal Dashboard webhook not configured. Results won't be sent to dashboard."
+          else
+            echo "configured=true" >> $GITHUB_OUTPUT
+            echo "✅ Sentinal Dashboard webhook configured"
+          fi
+      
       - name: Send SonarQube Results to Dashboard
-        if: always()
+        if: always() && steps.check_sonar.outputs.configured == 'true' && steps.check_dashboard.outputs.configured == 'true'
         run: |
           curl -X POST "${{ secrets.SENTINAL_API_URL }}/api/cicd/webhook/sonarqube" \
             -H "Content-Type: application/json" \
@@ -161,12 +352,21 @@ jobs:
                 \"commit\": \"${{ github.sha }}\",
                 \"branch\": \"${{ github.ref_name }}\"
               }
-            }" || true
+            }" || echo "⚠️ Failed to send results to dashboard"
+      
+      - name: Skip Dashboard Webhook
+        if: steps.check_dashboard.outputs.configured == 'false'
+        run: |
+          echo "⚠️ Dashboard webhook skipped - secrets not configured"
+          echo "To enable dashboard integration:"
+          echo "1. Set SENTINAL_API_URL secret (e.g., https://your-ngrok-url.ngrok.io)"
+          echo "2. Set SENTINAL_API_TOKEN secret (create API token in Sentinal dashboard)"
+          echo "3. See README for ngrok setup instructions"
 
   container-scan:
     name: Container Scan (Trivy)
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [smoke-test]
     steps:
       - uses: actions/checkout@v4
       
@@ -186,8 +386,17 @@ jobs:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
       
+      - name: Check Sentinal Dashboard configuration
+        id: check_dashboard_trivy
+        run: |
+          if [ -z "${{ secrets.SENTINAL_API_URL }}" ] || [ -z "${{ secrets.SENTINAL_API_TOKEN }}" ]; then
+            echo "configured=false" >> $GITHUB_OUTPUT
+          else
+            echo "configured=true" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Send Trivy Results to Dashboard
-        if: always()
+        if: always() && steps.check_dashboard_trivy.outputs.configured == 'true'
         run: |
           curl -X POST "${{ secrets.SENTINAL_API_URL }}/api/cicd/webhook/trivy" \
             -H "Content-Type: application/json" \
@@ -202,12 +411,12 @@ jobs:
                 \"commit\": \"${{ github.sha }}\",
                 \"branch\": \"${{ github.ref_name }}\"
               }
-            }" || true
+            }" || echo "⚠️ Failed to send results to dashboard"
 
   dast:
     name: DAST Scan (OWASP ZAP)
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [smoke-test]
     steps:
       - uses: actions/checkout@v4
       
@@ -218,8 +427,17 @@ jobs:
           target: 'http://localhost'
         continue-on-error: true
       
+      - name: Check Sentinal Dashboard configuration
+        id: check_dashboard_zap
+        run: |
+          if [ -z "${{ secrets.SENTINAL_API_URL }}" ] || [ -z "${{ secrets.SENTINAL_API_TOKEN }}" ]; then
+            echo "configured=false" >> $GITHUB_OUTPUT
+          else
+            echo "configured=true" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Send ZAP Results to Dashboard
-        if: always()
+        if: always() && steps.check_dashboard_zap.outputs.configured == 'true'
         run: |
           curl -X POST "${{ secrets.SENTINAL_API_URL }}/api/cicd/webhook/zap" \
             -H "Content-Type: application/json" \
@@ -234,7 +452,7 @@ jobs:
                 \"commit\": \"${{ github.sha }}\",
                 \"branch\": \"${{ github.ref_name }}\"
               }
-            }" || true
+            }" || echo "⚠️ Failed to send results to dashboard"
 
   deployment-gate:
     name: Deployment Gate

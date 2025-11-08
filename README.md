@@ -140,6 +140,7 @@ docker compose --env-file .docker.env up -d --build
 - [`backend/README.md`](backend/README.md) - Backend API documentation
 - [`frontend/README.md`](frontend/README.md) - Frontend documentation
 - [`techdocs/`](techdocs/) - Architecture diagrams, API docs, setup guides
+- [`techdocs/ngrok-setup.md`](techdocs/ngrok-setup.md) - ngrok setup for local development with GitHub Actions
 
 ## 🔧 Development
 
