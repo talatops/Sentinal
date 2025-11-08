@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cyber-blue: #00D9FF;
+  --color-cyber-green: #00FF88;
+  --color-cyber-purple: #8B5CF6;
+  --color-cyber-dark: #0A0E27;
+  --color-cyber-darker: #050710;
+  
+  --animate-slide-in: slideIn 0.3s ease-out;
+  --animate-fade-in: fadeIn 0.3s ease-out;
+  --animate-pulse-cyber: pulseCyber 2s ease-in-out infinite;
+  
+  @keyframes slideIn {
+    0% { transform: translateX(-100%); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+  
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  
+  @keyframes pulseCyber {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-cyber-darker text-gray-100;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-cyber-blue text-cyber-darker font-semibold px-6 py-2 rounded-lg hover:bg-cyber-blue/80 transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-cyber-green text-cyber-darker font-semibold px-6 py-2 rounded-lg hover:bg-cyber-green/80 transition-colors;
+  }
+  
+  .card {
+    @apply bg-cyber-dark border border-cyber-blue/20 rounded-lg p-6 shadow-lg;
+  }
+  
+  .input-field {
+    @apply bg-cyber-dark border border-cyber-blue/30 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:border-cyber-blue;
+  }
+}
