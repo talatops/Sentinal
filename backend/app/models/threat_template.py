@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 class ThreatTemplate(db.Model):
     """Model for threat templates."""
     __tablename__ = 'threat_templates'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
@@ -19,10 +19,10 @@ class ThreatTemplate(db.Model):
     default_dread_scores = db.Column(JSONB, nullable=True)  # Default DREAD scores
     default_mitigation = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    
+
     def __repr__(self):
         return f'<ThreatTemplate {self.name}>'
-    
+
     def to_dict(self):
         """Convert to dictionary."""
         return {
@@ -38,4 +38,3 @@ class ThreatTemplate(db.Model):
             'default_mitigation': self.default_mitigation,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-

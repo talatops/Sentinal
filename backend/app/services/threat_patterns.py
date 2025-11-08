@@ -294,81 +294,81 @@ THREAT_PATTERNS = {
 def detect_component_type(asset: str, flow: str) -> List[str]:
     """
     Detect component types from asset and flow descriptions.
-    
+
     Args:
         asset: Asset name/description
         flow: Data flow description
-        
+
     Returns:
         List of detected component types
     """
     text = f"{asset} {flow}".lower()
     component_types = []
-    
+
     # Component type detection patterns
     if any(keyword in text for keyword in ['database', 'db', 'postgres', 'mysql', 'mongodb', 'sql']):
         component_types.append('database')
-    
+
     if any(keyword in text for keyword in ['api', 'endpoint', 'rest', 'graphql', 'service']):
         component_types.append('api')
-    
+
     if any(keyword in text for keyword in ['auth', 'login', 'credential', 'token', 'session']):
         component_types.append('authentication')
-    
+
     if any(keyword in text for keyword in ['authorize', 'permission', 'role', 'access control']):
         component_types.append('authorization')
-    
+
     if any(keyword in text for keyword in ['frontend', 'ui', 'web', 'browser', 'client']):
         component_types.append('frontend')
-    
+
     if any(keyword in text for keyword in ['backend', 'server', 'application']):
         component_types.append('backend')
-    
+
     if any(keyword in text for keyword in ['file', 'storage', 's3', 'blob']):
         component_types.append('file_system')
-    
+
     if any(keyword in text for keyword in ['network', 'http', 'https', 'tcp', 'udp']):
         component_types.append('network')
-    
+
     if any(keyword in text for keyword in ['log', 'audit', 'monitoring']):
         component_types.append('logging')
-    
+
     return component_types if component_types else ['generic']
 
 
 def match_threat_patterns(asset: str, flow: str, trust_boundary: str = None) -> List[Tuple[str, float, Dict[str, Any]]]:
     """
     Match threat patterns against asset and flow descriptions.
-    
+
     Args:
         asset: Asset description
         flow: Data flow description
         trust_boundary: Trust boundary description
-        
+
     Returns:
         List of tuples: (pattern_name, confidence, pattern_data)
     """
     text = f"{asset} {flow} {trust_boundary or ''}".lower()
     matches = []
-    
+
     for pattern_name, pattern_data in THREAT_PATTERNS.items():
         confidence = 0.0
         matched_patterns = []
-        
+
         # Check each regex pattern
         for pattern in pattern_data['patterns']:
             if re.search(pattern, text, re.IGNORECASE):
                 matched_patterns.append(pattern)
                 confidence = max(confidence, pattern_data['confidence'])
-        
+
         # Boost confidence if component types match
         component_types = detect_component_type(asset, flow)
         if any(ct in pattern_data.get('component_types', []) for ct in component_types):
             confidence = min(confidence + 0.1, 1.0)
-        
+
         if matched_patterns:
             matches.append((pattern_name, confidence, pattern_data))
-    
+
     # Sort by confidence (highest first)
     matches.sort(key=lambda x: x[1], reverse=True)
     return matches
@@ -377,10 +377,10 @@ def match_threat_patterns(asset: str, flow: str, trust_boundary: str = None) -> 
 def get_stride_from_patterns(matched_patterns: List[Tuple[str, float, Dict[str, Any]]]) -> List[str]:
     """
     Extract STRIDE categories from matched threat patterns.
-    
+
     Args:
         matched_patterns: List of matched patterns
-        
+
     Returns:
         List of unique STRIDE categories
     """
@@ -393,10 +393,10 @@ def get_stride_from_patterns(matched_patterns: List[Tuple[str, float, Dict[str, 
 def get_suggested_dread_from_patterns(matched_patterns: List[Tuple[str, float, Dict[str, Any]]]) -> Dict[str, int]:
     """
     Get suggested DREAD scores from matched patterns (weighted average).
-    
+
     Args:
         matched_patterns: List of matched patterns with confidence
-        
+
     Returns:
         Dictionary with suggested DREAD scores
     """
@@ -408,12 +408,12 @@ def get_suggested_dread_from_patterns(matched_patterns: List[Tuple[str, float, D
             'affected_users': 5,
             'discoverability': 5
         }
-    
+
     # Weighted average based on confidence
     total_weight = sum(conf for _, conf, _ in matched_patterns)
     if total_weight == 0:
         total_weight = 1
-    
+
     suggested = {
         'damage': 0,
         'reproducibility': 0,
@@ -421,13 +421,12 @@ def get_suggested_dread_from_patterns(matched_patterns: List[Tuple[str, float, D
         'affected_users': 0,
         'discoverability': 0
     }
-    
+
     for _, confidence, pattern_data in matched_patterns:
         weight = confidence / total_weight
         dread = pattern_data['suggested_dread']
         for key in suggested:
             suggested[key] += dread[key] * weight
-    
+
     # Round to integers
     return {key: int(round(value)) for key, value in suggested.items()}
-

@@ -1,14 +1,14 @@
 """Security scanner service for integrating with Trivy, OWASP ZAP, and SonarQube."""
 import requests
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from flask import current_app
 from datetime import datetime
 
 
 class SecurityScanner:
     """Service for running security scans."""
-    
+
     def __init__(self):
         """Initialize scanner with configuration."""
         self.trivy_url = current_app.config.get('TRIVY_API_URL', 'http://trivy:8080')
@@ -16,26 +16,26 @@ class SecurityScanner:
         self.sonarqube_url = current_app.config.get('SONARQUBE_URL', 'http://sonarqube:9000')
         self.sonarqube_token = current_app.config.get('SONARQUBE_TOKEN', '')
         self.sonarqube_project_key = current_app.config.get('SONARQUBE_PROJECT_KEY', 'sentinal')
-    
+
     def run_sast_scan(self, commit_hash: str, project_key: Optional[str] = None) -> Dict[str, Any]:
         """
         Run SAST scan using SonarQube.
-        
+
         Args:
             commit_hash: Git commit hash
             project_key: SonarQube project key (optional, uses config default)
-            
+
         Returns:
             Dictionary with complete scan results including all issues
         """
         try:
             project_key = project_key or self.sonarqube_project_key
-            
+
             # Get all issues with pagination
             all_issues = []
             page = 1
             page_size = 500
-            
+
             while True:
                 response = requests.get(
                     f'{self.sonarqube_url}/api/issues/search',
@@ -48,34 +48,36 @@ class SecurityScanner:
                     auth=(self.sonarqube_token, ''),
                     timeout=30
                 )
-                
+
                 if response.status_code != 200:
                     current_app.logger.error(f'SonarQube API error: {response.status_code} - {response.text}')
                     break
-                
+
                 data = response.json()
                 issues = data.get('issues', [])
                 all_issues.extend(issues)
-                
+
                 # Check if more pages
                 paging = data.get('paging', {})
                 if paging.get('pageIndex', 0) * paging.get('pageSize', 0) >= paging.get('total', 0):
                     break
-                
+
                 page += 1
-            
+
             # Get metrics
             metrics_response = requests.get(
                 f'{self.sonarqube_url}/api/measures/component',
                 params={
                     'component': project_key,
-                    'metricKeys': 'coverage,bugs,vulnerabilities,code_smells,security_hotspots,'
-                                 'technical_debt,duplicated_lines_density,ncloc,files'
+                    'metricKeys': (
+                        'coverage,bugs,vulnerabilities,code_smells,security_hotspots,'
+                        'technical_debt,duplicated_lines_density,ncloc,files'
+                    )
                 },
                 auth=(self.sonarqube_token, ''),
                 timeout=30
             )
-            
+
             metrics = {}
             if metrics_response.status_code == 200:
                 metrics_data = metrics_response.json()
@@ -91,7 +93,7 @@ class SecurityScanner:
                             metrics[metric_key] = self._parse_technical_debt(value)
                         else:
                             metrics[metric_key] = int(value)
-            
+
             # Get quality gate status
             quality_gate_response = requests.get(
                 f'{self.sonarqube_url}/api/qualitygates/project_status',
@@ -99,7 +101,7 @@ class SecurityScanner:
                 auth=(self.sonarqube_token, ''),
                 timeout=30
             )
-            
+
             quality_gate = {'status': 'UNKNOWN'}
             if quality_gate_response.status_code == 200:
                 qg_data = quality_gate_response.json()
@@ -107,14 +109,14 @@ class SecurityScanner:
                     'status': qg_data.get('projectStatus', {}).get('status', 'UNKNOWN'),
                     'conditions': qg_data.get('projectStatus', {}).get('conditions', [])
                 }
-            
+
             # Count issues by severity
             severity_counts = {'CRITICAL': 0, 'BLOCKER': 0, 'MAJOR': 0, 'MINOR': 0, 'INFO': 0}
             for issue in all_issues:
                 severity = issue.get('severity', 'INFO')
                 if severity in severity_counts:
                     severity_counts[severity] += 1
-            
+
             # Parse issues with full details
             parsed_issues = []
             for issue in all_issues:
@@ -134,7 +136,7 @@ class SecurityScanner:
                     'flows': issue.get('flows', []),
                     'tags': issue.get('tags', [])
                 }
-                
+
                 # Get rule details if available
                 if issue.get('rule'):
                     try:
@@ -151,15 +153,15 @@ class SecurityScanner:
                             parsed_issue['effort'] = rule_data.get('debtRemFn', {}).get('coeff', '')
                     except Exception as e:
                         current_app.logger.warning(f'Failed to get rule details: {e}')
-                
+
                 parsed_issues.append(parsed_issue)
-            
+
             # Map severity to standard levels
             critical = severity_counts.get('CRITICAL', 0) + severity_counts.get('BLOCKER', 0)
             high = severity_counts.get('MAJOR', 0)
             medium = severity_counts.get('MINOR', 0)
             low = severity_counts.get('INFO', 0)
-            
+
             return {
                 'status': 'completed',
                 'project_key': project_key,
@@ -186,14 +188,14 @@ class SecurityScanner:
                 'total': 0,
                 'issues': []
             }
-    
+
     def run_trivy_scan(self, image_name: str = 'sentinal-backend:latest') -> Dict[str, Any]:
         """
         Run Trivy container scan.
-        
+
         Args:
             image_name: Docker image name to scan
-            
+
         Returns:
             Dictionary with complete vulnerability data
         """
@@ -204,7 +206,7 @@ class SecurityScanner:
                 json={'image': image_name},
                 timeout=300  # 5 minutes timeout
             )
-            
+
             if scan_response.status_code != 200:
                 current_app.logger.error(f'Trivy scan submission failed: {scan_response.status_code}')
                 return {
@@ -213,14 +215,14 @@ class SecurityScanner:
                     'critical': 0,
                     'total': 0
                 }
-            
+
             scan_data = scan_response.json()
             scan_id = scan_data.get('scan_id')
-            
+
             if not scan_id:
                 # If no scan_id, try direct scan (older API)
                 return self._trivy_direct_scan(image_name)
-            
+
             # Poll for results
             max_attempts = 60
             attempt = 0
@@ -229,7 +231,7 @@ class SecurityScanner:
                     f'{self.trivy_url}/v1/scan/{scan_id}',
                     timeout=30
                 )
-                
+
                 if result_response.status_code == 200:
                     result_data = result_response.json()
                     if result_data.get('status') == 'completed':
@@ -241,17 +243,17 @@ class SecurityScanner:
                             'critical': 0,
                             'total': 0
                         }
-                
+
                 time.sleep(2)
                 attempt += 1
-            
+
             return {
                 'status': 'failed',
                 'error': 'Scan timeout',
                 'critical': 0,
                 'total': 0
             }
-            
+
         except Exception as e:
             current_app.logger.error(f'Trivy scan failed: {str(e)}')
             return {
@@ -260,7 +262,7 @@ class SecurityScanner:
                 'critical': 0,
                 'total': 0
             }
-    
+
     def _trivy_direct_scan(self, image_name: str) -> Dict[str, Any]:
         """Fallback direct scan for Trivy."""
         try:
@@ -270,10 +272,10 @@ class SecurityScanner:
                 params={'format': 'json'},
                 timeout=300
             )
-            
+
             if response.status_code == 200:
                 return self._parse_trivy_results(response.json(), image_name)
-            
+
             return {
                 'status': 'failed',
                 'error': 'Trivy API not available',
@@ -287,30 +289,29 @@ class SecurityScanner:
                 'critical': 0,
                 'total': 0
             }
-    
+
     def _parse_trivy_results(self, data: Dict[str, Any], image_name: str) -> Dict[str, Any]:
         """Parse Trivy scan results."""
         vulnerabilities = []
         severity_counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'UNKNOWN': 0}
-        
+
         # Parse results structure
         results = data.get('Results', [])
         os_packages = {'total': 0, 'vulnerable': 0}
         language_packages = {}
-        
+
         for result in results:
             result_type = result.get('Type', '')
-            target = result.get('Target', '')
-            
+
             if result_type == 'os':
                 packages = result.get('Packages', [])
                 os_packages['total'] = len(packages)
-                
+
                 for vuln in result.get('Vulnerabilities', []):
                     severity = vuln.get('Severity', 'UNKNOWN')
                     if severity in severity_counts:
                         severity_counts[severity] += 1
-                    
+
                     parsed_vuln = {
                         'vulnerability_id': vuln.get('VulnerabilityID'),
                         'pkg_name': vuln.get('PkgName'),
@@ -332,19 +333,19 @@ class SecurityScanner:
                     }
                     vulnerabilities.append(parsed_vuln)
                     os_packages['vulnerable'] += 1
-            
+
             elif result_type in ['python', 'node', 'go', 'java']:
                 if result_type not in language_packages:
                     language_packages[result_type] = {'total': 0, 'vulnerable': 0}
-                
+
                 packages = result.get('Packages', [])
                 language_packages[result_type]['total'] = len(packages)
-                
+
                 for vuln in result.get('Vulnerabilities', []):
                     severity = vuln.get('Severity', 'UNKNOWN')
                     if severity in severity_counts:
                         severity_counts[severity] += 1
-                    
+
                     parsed_vuln = {
                         'vulnerability_id': vuln.get('VulnerabilityID'),
                         'pkg_name': vuln.get('PkgName'),
@@ -365,9 +366,9 @@ class SecurityScanner:
                     }
                     vulnerabilities.append(parsed_vuln)
                     language_packages[result_type]['vulnerable'] += 1
-        
+
         metadata = data.get('Metadata', {})
-        
+
         return {
             'status': 'completed',
             'image': image_name,
@@ -388,15 +389,15 @@ class SecurityScanner:
                 'repo_digests': metadata.get('RepoDigests', [])
             }
         }
-    
+
     def run_dast_scan(self, target_url: str = 'http://localhost', scan_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Run DAST scan using OWASP ZAP.
-        
+
         Args:
             target_url: URL to scan
             scan_id: Optional scan ID for status checking
-            
+
         Returns:
             Dictionary with complete alert data
         """
@@ -404,14 +405,14 @@ class SecurityScanner:
             # If scan_id provided, check status
             if scan_id:
                 return self._get_zap_scan_status(scan_id, target_url)
-            
+
             # Start spider scan
             spider_response = requests.get(
                 f'{self.zap_url}/JSON/spider/action/scan',
                 params={'url': target_url},
                 timeout=30
             )
-            
+
             if spider_response.status_code != 200:
                 current_app.logger.error(f'ZAP spider scan failed: {spider_response.status_code}')
                 return {
@@ -420,39 +421,39 @@ class SecurityScanner:
                     'critical': 0,
                     'total': 0
                 }
-            
+
             spider_data = spider_response.json()
             spider_scan_id = spider_data.get('scan')
-            
+
             # Wait for spider to complete
             spider_complete = False
             max_wait = 300  # 5 minutes
             waited = 0
-            
+
             while not spider_complete and waited < max_wait:
                 status_response = requests.get(
                     f'{self.zap_url}/JSON/spider/view/status',
                     params={'scanId': spider_scan_id},
                     timeout=10
                 )
-                
+
                 if status_response.status_code == 200:
                     status_data = status_response.json()
                     progress = int(status_data.get('status', 0))
                     if progress >= 100:
                         spider_complete = True
                         break
-                
+
                 time.sleep(2)
                 waited += 2
-            
+
             # Start active scan
             active_response = requests.get(
                 f'{self.zap_url}/JSON/ascan/action/scan',
                 params={'url': target_url},
                 timeout=30
             )
-            
+
             if active_response.status_code != 200:
                 return {
                     'status': 'running',
@@ -461,22 +462,22 @@ class SecurityScanner:
                     'spider_complete': spider_complete,
                     'message': 'Active scan failed to start'
                 }
-            
+
             active_data = active_response.json()
             active_scan_id = active_data.get('scan')
-            
+
             # Get spider results
             spider_results_response = requests.get(
                 f'{self.zap_url}/JSON/spider/view/results',
                 params={'scanId': spider_scan_id},
                 timeout=10
             )
-            
+
             urls_found = 0
             if spider_results_response.status_code == 200:
                 spider_results = spider_results_response.json()
                 urls_found = len(spider_results.get('results', []))
-            
+
             # Return running status with scan IDs
             return {
                 'status': 'running',
@@ -487,7 +488,7 @@ class SecurityScanner:
                 'spider_results': {'urls_found': urls_found},
                 'scan_start': datetime.utcnow().isoformat()
             }
-            
+
         except Exception as e:
             current_app.logger.error(f'ZAP scan failed: {str(e)}')
             return {
@@ -496,7 +497,7 @@ class SecurityScanner:
                 'critical': 0,
                 'total': 0
             }
-    
+
     def _get_zap_scan_status(self, scan_id: str, target_url: str) -> Dict[str, Any]:
         """Get ZAP scan status and results."""
         try:
@@ -506,12 +507,12 @@ class SecurityScanner:
                 params={'scanId': scan_id},
                 timeout=10
             )
-            
+
             progress = 0
             if status_response.status_code == 200:
                 status_data = status_response.json()
                 progress = int(status_data.get('status', 0))
-            
+
             if progress < 100:
                 return {
                     'status': 'running',
@@ -519,14 +520,14 @@ class SecurityScanner:
                     'active_scan_id': scan_id,
                     'active_scan_progress': progress
                 }
-            
+
             # Scan complete, get alerts
             alerts_response = requests.get(
                 f'{self.zap_url}/JSON/core/view/alerts',
                 params={'baseurl': target_url},
                 timeout=30
             )
-            
+
             if alerts_response.status_code != 200:
                 return {
                     'status': 'completed',
@@ -535,19 +536,19 @@ class SecurityScanner:
                     'total': 0,
                     'alerts': []
                 }
-            
+
             alerts_data = alerts_response.json()
             alerts = alerts_data.get('alerts', [])
-            
+
             # Parse alerts
             parsed_alerts = []
             severity_counts = {'Critical': 0, 'High': 0, 'Medium': 0, 'Low': 0, 'Informational': 0}
-            
+
             for alert in alerts:
                 risk = alert.get('risk', 'Informational')
                 if risk in severity_counts:
                     severity_counts[risk] += 1
-                
+
                 parsed_alert = {
                     'id': alert.get('pluginId'),
                     'name': alert.get('name'),
@@ -570,14 +571,7 @@ class SecurityScanner:
                     'sourceid': alert.get('sourceid')
                 }
                 parsed_alerts.append(parsed_alert)
-            
-            # Get alerts summary
-            summary_response = requests.get(
-                f'{self.zap_url}/JSON/core/view/alertsSummary',
-                params={'baseurl': target_url},
-                timeout=10
-            )
-            
+
             return {
                 'status': 'completed',
                 'target': target_url,
@@ -594,7 +588,7 @@ class SecurityScanner:
                 'spider_results': {'urls_found': 0, 'urls_scanned': 0},
                 'active_scan_progress': 100
             }
-            
+
         except Exception as e:
             current_app.logger.error(f'ZAP status check failed: {str(e)}')
             return {
@@ -603,7 +597,7 @@ class SecurityScanner:
                 'critical': 0,
                 'total': 0
             }
-    
+
     def _parse_technical_debt(self, value: str) -> str:
         """Parse technical debt value."""
         # SonarQube returns technical debt in minutes
@@ -614,5 +608,5 @@ class SecurityScanner:
             if hours > 0:
                 return f'{hours}h {mins}min'
             return f'{mins}min'
-        except:
+        except Exception:
             return value

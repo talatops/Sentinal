@@ -7,7 +7,7 @@ from sqlalchemy import CheckConstraint
 class User(db.Model):
     """User model for authentication and authorization."""
     __tablename__ = 'users'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
@@ -17,17 +17,17 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     last_login = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
-    
+
     # Relationships
     requirements = db.relationship('Requirement', backref='creator', lazy='dynamic')
-    
+
     __table_args__ = (
         CheckConstraint("role IN ('Admin', 'Developer')", name='check_role'),
     )
-    
+
     def __repr__(self):
         return f'<User {self.username}>'
-    
+
     def to_dict(self):
         """Convert user to dictionary."""
         return {
@@ -39,4 +39,3 @@ class User(db.Model):
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'is_active': self.is_active
         }
-

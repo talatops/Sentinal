@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 class CICDRun(db.Model):
     """CI/CD run model for tracking pipeline executions."""
     __tablename__ = 'ci_cd_runs'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     commit_hash = db.Column(db.String(40), nullable=False, index=True)
     branch = db.Column(db.String(100), nullable=False)
@@ -21,10 +21,10 @@ class CICDRun(db.Model):
     total_vulnerabilities = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     completed_at = db.Column(db.DateTime, nullable=True)
-    
+
     def __repr__(self):
         return f'<CICDRun {self.commit_hash[:8]}>'
-    
+
     def to_dict(self):
         """Convert CI/CD run to dictionary."""
         return {
@@ -42,4 +42,3 @@ class CICDRun(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None
         }
-

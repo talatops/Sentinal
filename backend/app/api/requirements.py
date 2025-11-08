@@ -22,13 +22,13 @@ class RequirementSchema(Schema):
 
 class RequirementList(Resource):
     """Requirements list endpoint."""
-    
+
     @jwt_required()
     def get(self):
         """Get all requirements."""
         requirements = Requirement.query.order_by(Requirement.created_at.desc()).all()
         return {'requirements': [req.to_dict() for req in requirements]}, 200
-    
+
     @jwt_required()
     def post(self):
         """Create a new requirement."""
@@ -37,13 +37,13 @@ class RequirementList(Resource):
             data = schema.load(request.json)
         except ValidationError as err:
             return {'errors': err.messages}, 400
-        
+
         # Ensure at least one security control
         if not data.get('security_controls'):
             return {'error': 'At least one security control is required'}, 400
-        
+
         user_id = get_jwt_identity()
-        
+
         # Create requirement
         requirement = Requirement(
             title=data['title'],
@@ -53,10 +53,10 @@ class RequirementList(Resource):
             status=data.get('status', 'Draft'),
             owasp_asvs_level=data.get('owasp_asvs_level')
         )
-        
+
         db.session.add(requirement)
         db.session.flush()
-        
+
         # Create security controls
         for ctrl_data in data['security_controls']:
             control = SecurityControl(
@@ -66,34 +66,34 @@ class RequirementList(Resource):
                 requirement_id=requirement.id
             )
             db.session.add(control)
-        
+
         db.session.commit()
-        
+
         return {'requirement': requirement.to_dict()}, 201
 
 
 class RequirementDetail(Resource):
     """Requirement detail endpoint."""
-    
+
     @jwt_required()
     def get(self, req_id):
         """Get requirement details."""
         requirement = Requirement.query.get_or_404(req_id)
         return {'requirement': requirement.to_dict()}, 200
-    
+
     @jwt_required()
     def put(self, req_id):
         """Update requirement."""
         requirement = Requirement.query.get_or_404(req_id)
         user_id = get_jwt_identity()
-        
+
         # Check permissions
         if requirement.created_by != user_id:
             from app.models.user import User
             user = User.query.get(user_id)
             if user.role != 'Admin':
                 return {'error': 'Insufficient permissions'}, 403
-        
+
         data = request.json
         if 'title' in data:
             requirement.title = data['title']
@@ -103,23 +103,23 @@ class RequirementDetail(Resource):
             requirement.status = data['status']
         if 'owasp_asvs_level' in data:
             requirement.owasp_asvs_level = data['owasp_asvs_level']
-        
+
         db.session.commit()
         return {'requirement': requirement.to_dict()}, 200
-    
+
     @jwt_required()
     def delete(self, req_id):
         """Delete requirement."""
         requirement = Requirement.query.get_or_404(req_id)
         user_id = get_jwt_identity()
-        
+
         # Check permissions
         if requirement.created_by != user_id:
             from app.models.user import User
             user = User.query.get(user_id)
             if user.role != 'Admin':
                 return {'error': 'Insufficient permissions'}, 403
-        
+
         db.session.delete(requirement)
         db.session.commit()
         return {'message': 'Requirement deleted successfully'}, 200
@@ -127,19 +127,19 @@ class RequirementDetail(Resource):
 
 class SecurityControlList(Resource):
     """Security controls for a requirement."""
-    
+
     @jwt_required()
     def get(self, req_id):
         """Get security controls for a requirement."""
-        requirement = Requirement.query.get_or_404(req_id)
+        Requirement.query.get_or_404(req_id)  # Verify requirement exists
         controls = SecurityControl.query.filter_by(requirement_id=req_id).all()
         return {'controls': [ctrl.to_dict() for ctrl in controls]}, 200
-    
+
     @jwt_required()
     def post(self, req_id):
         """Add security control to requirement."""
-        requirement = Requirement.query.get_or_404(req_id)
-        
+        Requirement.query.get_or_404(req_id)  # Verify requirement exists
+
         data = request.json
         control = SecurityControl(
             name=data.get('name', ''),
@@ -147,27 +147,31 @@ class SecurityControlList(Resource):
             owasp_asvs_level=data.get('owasp_asvs_level'),
             requirement_id=req_id
         )
-        
+
         db.session.add(control)
         db.session.commit()
-        
+
         return {'control': control.to_dict()}, 201
 
 
 class RequirementExport(Resource):
     """Export requirements."""
-    
+
     @jwt_required()
     def get(self):
         """Export requirements as CSV or JSON."""
         format_type = request.args.get('format', 'json')
         requirements = Requirement.query.all()
-        
+
         if format_type == 'csv':
             output = io.StringIO()
             writer = csv.writer(output)
-            writer.writerow(['ID', 'Title', 'Description', 'Status', 'OWASP ASVS Level', 'Security Controls', 'Created At'])
-            
+            headers = [
+                'ID', 'Title', 'Description', 'Status',
+                'OWASP ASVS Level', 'Security Controls', 'Created At'
+            ]
+            writer.writerow(headers)
+
             for req in requirements:
                 controls = ', '.join([ctrl.name for ctrl in req.controls])
                 writer.writerow([
@@ -179,7 +183,7 @@ class RequirementExport(Resource):
                     controls,
                     req.created_at.isoformat() if req.created_at else ''
                 ])
-            
+
             return jsonify({
                 'data': output.getvalue(),
                 'format': 'csv'
@@ -190,16 +194,21 @@ class RequirementExport(Resource):
 
 class ComplianceDashboard(Resource):
     """Compliance dashboard endpoint."""
-    
+
     @admin_required
     def get(self):
         """Get compliance dashboard data."""
         requirements = Requirement.query.all()
-        
+
         total_requirements = len(requirements)
-        requirements_with_controls = sum(1 for req in requirements if req.controls.count() > 0)
-        compliance_rate = (requirements_with_controls / total_requirements * 100) if total_requirements > 0 else 0
-        
+        requirements_with_controls = sum(
+            1 for req in requirements if req.controls.count() > 0
+        )
+        compliance_rate = (
+            (requirements_with_controls / total_requirements * 100)
+            if total_requirements > 0 else 0
+        )
+
         # OWASP ASVS level distribution
         level_distribution = {
             'Level 1': sum(1 for req in requirements if req.owasp_asvs_level == 'Level 1'),
@@ -207,12 +216,12 @@ class ComplianceDashboard(Resource):
             'Level 3': sum(1 for req in requirements if req.owasp_asvs_level == 'Level 3'),
             'Not Specified': sum(1 for req in requirements if not req.owasp_asvs_level)
         }
-        
+
         # Status distribution
         status_distribution = {}
         for req in requirements:
             status_distribution[req.status] = status_distribution.get(req.status, 0) + 1
-        
+
         return {
             'total_requirements': total_requirements,
             'requirements_with_controls': requirements_with_controls,
@@ -220,4 +229,3 @@ class ComplianceDashboard(Resource):
             'owasp_asvs_distribution': level_distribution,
             'status_distribution': status_distribution
         }, 200
-

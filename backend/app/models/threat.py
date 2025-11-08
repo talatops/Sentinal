@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 class Threat(db.Model):
     """Threat model for threat modeling."""
     __tablename__ = 'threats'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     asset = db.Column(db.String(200), nullable=False)
     flow = db.Column(db.Text, nullable=False)
@@ -18,10 +18,10 @@ class Threat(db.Model):
     mitigation = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     def __repr__(self):
         return f'<Threat {self.asset}>'
-    
+
     def to_dict(self):
         """Convert threat to dictionary."""
         return {
@@ -36,4 +36,3 @@ class Threat(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
-

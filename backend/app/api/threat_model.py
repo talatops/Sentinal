@@ -1,7 +1,6 @@
 """Threat modeling API endpoints."""
 from flask import request
 from flask_restful import Resource
-from flask_jwt_extended import get_jwt_identity
 from app.core.security import jwt_required
 from marshmallow import Schema, fields, ValidationError, validate
 from app import db
@@ -27,7 +26,7 @@ class ThreatAnalyzeSchema(Schema):
 
 class ThreatAnalyze(Resource):
     """Threat analysis endpoint."""
-    
+
     @jwt_required()
     def post(self):
         """Analyze a threat using STRIDE/DREAD."""
@@ -36,9 +35,9 @@ class ThreatAnalyze(Resource):
             data = schema.load(request.json)
         except ValidationError as err:
             return {'errors': err.messages}, 400
-        
+
         auto_score = data.get('auto_score', False)
-        
+
         # Use advanced STRIDE engine to analyze
         engine = STRIDEEngine()
         advanced_analysis = engine.analyze_threat_advanced(
@@ -47,16 +46,17 @@ class ThreatAnalyze(Resource):
             data.get('trust_boundary')
         )
         stride_categories = advanced_analysis['stride_categories']
-        
+
         # Handle DREAD scoring
         dread_scorer = DREADScorer()
         user_scores = None
-        
+
         if not auto_score:
             # Manual scoring - validate all scores are provided
-            if not all(data.get(key) is not None for key in ['damage', 'reproducibility', 'exploitability', 'affected_users', 'discoverability']):
+            required_keys = ['damage', 'reproducibility', 'exploitability', 'affected_users', 'discoverability']
+            if not all(data.get(key) is not None for key in required_keys):
                 return {'errors': {'dread_scores': 'All DREAD scores are required when auto_score is false'}}, 400
-            
+
             dread_scores = {
                 'damage': data['damage'],
                 'reproducibility': data['reproducibility'],
@@ -78,7 +78,7 @@ class ThreatAnalyze(Resource):
                 user_scores['affected_users'] = data['affected_users']
             if data.get('discoverability') is not None:
                 user_scores['discoverability'] = data['discoverability']
-            
+
             dread_suggestions = dread_scorer.suggest_dread_scores(
                 data['asset'],
                 data['flow'],
@@ -86,14 +86,14 @@ class ThreatAnalyze(Resource):
                 user_scores if user_scores else None
             )
             dread_scores = dread_suggestions['suggested_scores']
-        
+
         # Calculate total score and risk level
         total_score = sum(dread_scores.values()) / 5.0
         risk_level = 'High' if total_score > 7 else 'Medium' if total_score > 4 else 'Low'
-        
+
         # Get mitigation recommendations
         mitigation = engine.get_mitigation_recommendations(stride_categories, risk_level)
-        
+
         # Try to get enhanced mitigations if available
         enhanced_mitigations = None
         try:
@@ -108,7 +108,7 @@ class ThreatAnalyze(Resource):
             )
         except ImportError:
             pass
-        
+
         # Create threat record
         threat = Threat(
             asset=data['asset'],
@@ -119,10 +119,10 @@ class ThreatAnalyze(Resource):
             risk_level=risk_level,
             mitigation=mitigation
         )
-        
+
         db.session.add(threat)
         db.session.commit()
-        
+
         response = {
             'threat': threat.to_dict(),
             'analysis': {
@@ -137,7 +137,7 @@ class ThreatAnalyze(Resource):
                 'mitigation': mitigation
             }
         }
-        
+
         # Include DREAD suggestions if auto-scoring was used
         if auto_score and dread_suggestions:
             response['analysis']['dread_suggestions'] = {
@@ -145,17 +145,17 @@ class ThreatAnalyze(Resource):
                 'confidence': dread_suggestions['confidence'],
                 'explanations': dread_suggestions['explanations']
             }
-        
+
         # Include enhanced mitigations if available
         if enhanced_mitigations:
             response['analysis']['enhanced_mitigations'] = enhanced_mitigations
-        
+
         return response, 201
 
 
 class ThreatList(Resource):
     """List all threats."""
-    
+
     @jwt_required()
     def get(self):
         """Get all threats."""
@@ -165,27 +165,27 @@ class ThreatList(Resource):
 
 class ThreatDetail(Resource):
     """Threat detail endpoint."""
-    
+
     @jwt_required()
     def get(self, threat_id):
         """Get threat details."""
         threat = Threat.query.get_or_404(threat_id)
         return {'threat': threat.to_dict()}, 200
-    
+
     @jwt_required()
     def put(self, threat_id):
         """Update threat."""
         threat = Threat.query.get_or_404(threat_id)
-        
+
         data = request.json
         if 'mitigation' in data:
             threat.mitigation = data['mitigation']
         if 'risk_level' in data:
             threat.risk_level = data['risk_level']
-        
+
         db.session.commit()
         return {'threat': threat.to_dict()}, 200
-    
+
     @jwt_required()
     def delete(self, threat_id):
         """Delete threat."""
@@ -197,11 +197,11 @@ class ThreatDetail(Resource):
 
 class ThreatVulnerabilities(Resource):
     """Get vulnerabilities linked to a threat."""
-    
+
     @jwt_required()
     def get(self, threat_id):
         """Get all vulnerabilities linked to a threat."""
-        threat = Threat.query.get_or_404(threat_id)
+        Threat.query.get_or_404(threat_id)  # Verify threat exists
         vulnerabilities = ThreatVulnerability.query.filter_by(threat_id=threat_id).all()
         return {
             'threat_id': threat_id,
@@ -211,32 +211,32 @@ class ThreatVulnerabilities(Resource):
 
 class LinkVulnerability(Resource):
     """Link a vulnerability to a threat."""
-    
+
     @jwt_required()
     def post(self, threat_id):
         """Link a vulnerability to a threat."""
-        threat = Threat.query.get_or_404(threat_id)
-        
+        Threat.query.get_or_404(threat_id)  # Verify threat exists
+
         data = request.json
         vulnerability_type = data.get('vulnerability_type')
         vulnerability_id = data.get('vulnerability_id')
         scan_run_id = data.get('scan_run_id')
         severity = data.get('severity')
         vulnerability_data = data.get('vulnerability_data')
-        
+
         if not vulnerability_type or not vulnerability_id:
             return {'error': 'vulnerability_type and vulnerability_id are required'}, 400
-        
+
         # Check if link already exists
         existing = ThreatVulnerability.query.filter_by(
             threat_id=threat_id,
             vulnerability_type=vulnerability_type,
             vulnerability_id=vulnerability_id
         ).first()
-        
+
         if existing:
             return {'error': 'Vulnerability already linked to this threat'}, 400
-        
+
         # Create link
         threat_vuln = ThreatVulnerability(
             threat_id=threat_id,
@@ -247,22 +247,22 @@ class LinkVulnerability(Resource):
             vulnerability_data=vulnerability_data,
             status='linked'
         )
-        
+
         db.session.add(threat_vuln)
         db.session.commit()
-        
+
         return {'vulnerability': threat_vuln.to_dict()}, 201
 
 
 class ThreatsWithVulnerabilities(Resource):
     """Get threats that have linked vulnerabilities."""
-    
+
     @jwt_required()
     def get(self):
         """Get all threats with linked vulnerabilities."""
         # Get threats that have at least one vulnerability
         threats = Threat.query.join(ThreatVulnerability).distinct().all()
-        
+
         result = []
         for threat in threats:
             threat_dict = threat.to_dict()
@@ -270,37 +270,36 @@ class ThreatsWithVulnerabilities(Resource):
             threat_dict['vulnerabilities'] = [v.to_dict() for v in vulnerabilities]
             threat_dict['vulnerability_count'] = len(vulnerabilities)
             result.append(threat_dict)
-        
+
         return {'threats': result}, 200
 
 
 class UpdateVulnerabilityStatus(Resource):
     """Update vulnerability status."""
-    
+
     @jwt_required()
     def put(self, vulnerability_id):
         """Update vulnerability status."""
         threat_vuln = ThreatVulnerability.query.get_or_404(vulnerability_id)
-        
+
         data = request.json
         status = data.get('status')
-        
+
         if status not in ['linked', 'resolved', 'false_positive']:
             return {'error': 'Invalid status. Must be: linked, resolved, or false_positive'}, 400
-        
+
         threat_vuln.status = status
         db.session.commit()
-        
+
         return {'vulnerability': threat_vuln.to_dict()}, 200
 
 
 class ThreatSimilar(Resource):
     """Get similar threats."""
-    
+
     @jwt_required()
     def get(self, threat_id):
         """Get threats similar to the specified threat."""
         similarity_service = ThreatSimilarityService()
         similar_threats = similarity_service.find_similar_threats(threat_id, limit=5)
         return {'similar_threats': similar_threats}, 200
-
