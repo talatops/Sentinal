@@ -1,426 +1,286 @@
-## 🧠 Project Prompt: “Project Sentinel — Secure-by-Design DevSecOps Framework”
+# 🛡️ Project Sentinel — Secure-by-Design DevSecOps Framework
 
-### **1. Overview**
+A comprehensive DevSecOps platform integrating Security-by-Design principles into every stage of the Software Development Lifecycle (SDLC). Project Sentinel provides automated threat modeling, security requirements management, and CI/CD pipeline security scanning.
 
-Develop a **secure software design and DevSecOps framework** called **Project Sentinel**, integrating **Security-by-Design** principles into every stage of the Software Development Lifecycle (SDLC). The system will include:
+## ✨ Features
 
-1. A **Security-by-Design CI/CD Pipeline** (automated SAST, DAST, container scanning).
+### 🔐 Advanced Threat Modeling Toolkit
+- **Intelligent STRIDE Analysis**: Advanced pattern recognition with 14 threat patterns
+- **Automated DREAD Scoring**: AI-powered risk assessment with confidence indicators
+- **Component Detection**: Automatic identification of system components
+- **Threat Templates**: 8 pre-built templates for common scenarios
+- **Vulnerability Correlation**: Link threats to actual scan findings (SonarQube, ZAP, Trivy)
+- **Threat Similarity Detection**: Find similar threats for learning and improvement
+- **Visual Analytics**: Interactive diagrams, threat matrices, and analytics dashboard
 
-2. An **Automated Threat Modeling Toolkit** (using STRIDE/DREAD methodology).
+### 📋 Secure Requirements Management Portal
+- Create, read, update, delete security requirements
+- Enforce one-to-one mapping of security controls to functional requirements
+- Admin dashboard for compliance auditing (OWASP ASVS)
+- Export security mappings (CSV/JSON)
+- Link requirements to threats and vulnerabilities
 
-3. A **Secure Requirements Management Portal** (enforcing one-to-one mapping of security controls to functional requirements).
+### 🚀 Security-by-Design CI/CD Pipeline
+- **SAST**: SonarQube integration for static analysis
+- **DAST**: OWASP ZAP integration for dynamic analysis
+- **Container Scanning**: Trivy integration for vulnerability detection
+- Real-time scan results dashboard
+- Webhook integration for GitHub Actions
+- API token authentication for webhooks
 
-The project will be built with a **React + Vite frontend**, **Python (Flask) backend**, and **PostgreSQL** database.
+### 🔑 Authentication & Authorization
+- JWT-based authentication
+- GitHub OAuth integration
+- Role-based access control (Admin/Developer)
+- API token management (Admin only)
+- Secure token refresh mechanism
 
----
+## 🏗️ Architecture
 
-### **2. Project Architecture**
+### Frontend (React + Vite)
+- **Framework**: React 19 with Vite 7
+- **State Management**: Zustand
+- **Routing**: React Router v6
+- **Styling**: Tailwind CSS (Cybersecurity theme)
+- **Visualization**: ReactFlow, Recharts
+- **Animations**: Framer Motion
+- **Validation**: Zod
 
-#### **Frontend (React + Vite)**
+### Backend (Python + Flask)
+- **Framework**: Flask 3.0 with Flask-RESTful
+- **Database**: PostgreSQL 15
+- **ORM**: SQLAlchemy
+- **Migrations**: Alembic
+- **Authentication**: Flask-JWT-Extended
+- **Real-time**: Flask-SocketIO (WebSockets)
+- **Security**: Flask-Limiter, Flask-Talisman
 
-* **Framework**: React 18 with Vite for fast build and HMR.
+### Infrastructure
+- **Containerization**: Docker & Docker Compose
+- **Web Server**: Nginx (reverse proxy)
+- **Database**: PostgreSQL
+- **Security Tools**: SonarQube, OWASP ZAP, Trivy
 
-* **Structure**:
+## 🚀 Quick Start
 
-* `/src/components` — modular UI components (Forms, Tables, Modals).
+### Prerequisites
+- Docker & Docker Compose
+- Git
 
-* `/src/pages` — pages for each module (ThreatModel, Requirements, Dashboard).
+### Installation
 
-* `/src/services` — Axios-based API clients with JWT interceptor.
-
-* `/src/utils/security.js` — Input sanitization & validation utilities.
-
-* **Routing**: React Router v6.
-
-* **Styling**: Tailwind CSS with dark mode toggle.
-
-* **State Management**: Redux Toolkit or Zustand.
-
-* **Security Additions**:
-
-* Form validation (Yup or Zod).
-
-* Output encoding to prevent XSS.
-
-* Secure localStorage handling for tokens (auto-expire on inactivity).
-
-* **Linters**:
-
-* ESLint (Airbnb config).
-
-* Prettier for code formatting.
-
-* Husky + lint-staged for pre-commit enforcement.
-
----
-
-#### **Backend (Python + Flask)**
-
-* **Framework**: Flask with Flask-RESTful for API modularization.
-
-* **Structure**:
-
+1. **Clone the repository**
+```bash
+git clone <repository-url>
+cd sentinal
 ```
 
-/app
-
-/api
-
-threat_model.py
-
-requirements.py
-
-auth.py
-
-/core
-
-config.py
-
-security.py
-
-/services
-
-stride_dread_engine.py
-
-/models
-
-requirement.py
-
-user.py
-
+2. **Configure environment variables**
+```bash
+cp .docker.env.example .docker.env
+# Edit .docker.env with your configuration
 ```
 
-* **Key Features**:
-
-* JWT-based Authentication (PyJWT).
-
-* Role-based Access Control (RBAC): Admin / Developer roles.
-
-* Secure Input Validation (marshmallow schemas).
-
-* Parameterized queries to prevent SQL Injection.
-
-* **Security Enhancements**:
-
-* Content Security Policy headers (via Flask-Talisman).
-
-* Rate limiting (Flask-Limiter).
-
-* Centralized logging & audit trails (Flask-Logging + structured JSON logs).
-
-* **Linters**:
-
-* flake8, bandit (security linter), black for formatting, mypy for type checking.
-
----
-
-#### **Database (PostgreSQL)**
-
-* Schema design:
-
-```sql
-
-TABLE users (
-
-id SERIAL PRIMARY KEY,
-
-username TEXT UNIQUE,
-
-password_hash TEXT,
-
-role TEXT CHECK (role IN ('Admin', 'Developer'))
-
-);
-
-TABLE requirements (
-
-id SERIAL PRIMARY KEY,
-
-title TEXT NOT NULL,
-
-description TEXT,
-
-security_controls JSONB NOT NULL,
-
-created_by INTEGER REFERENCES users(id)
-
-);
-
-TABLE threats (
-
-id SERIAL PRIMARY KEY,
-
-asset TEXT,
-
-flow TEXT,
-
-stride_categories JSONB,
-
-dread_score JSONB,
-
-risk_level TEXT
-
-);
-
+3. **Start the application**
+```bash
+docker compose --env-file .docker.env up -d --build
 ```
 
-* Enforce foreign key integrity and least privilege database access (separate read/write roles).
+4. **Access the application**
+- Frontend: http://localhost
+- Backend API: http://localhost/api
+- SonarQube: http://localhost:9000
+- OWASP ZAP: http://localhost:8090
+- Trivy: http://localhost:8080
 
----
+### Default Credentials
+- **SonarQube**: admin/admin (change on first login)
+- **PostgreSQL**: Configured in `.docker.env`
 
-### **3. Core Modules**
+## 📚 Documentation
 
-#### **A. Security-by-Design CI/CD Pipeline (GitHub Actions)**
+### Theory Documentation
+- [`theorydocs/stride-dread-methodology.md`](theorydocs/stride-dread-methodology.md) - Complete STRIDE/DREAD guide
+- [`theorydocs/how-stride-dread-works.md`](theorydocs/how-stride-dread-works.md) - Implementation details
 
-Automated pipeline enforcing security at every stage:
+### Technical Documentation
+- [`backend/README.md`](backend/README.md) - Backend API documentation
+- [`frontend/README.md`](frontend/README.md) - Frontend documentation
+- [`techdocs/`](techdocs/) - Architecture diagrams, API docs, setup guides
 
-1. **On Commit → Build Trigger**
+## 🔧 Development
 
-* Run ESLint, flake8, and bandit.
-
-* Build React app, run Jest/React Testing Library tests.
-
-2. **SAST (Static Testing)** — Run SonarQube scan.
-
-3. **Container Build + Scan**
-
-* Build Docker image.
-
-* Run Trivy to detect CVEs in OS and dependencies.
-
-4. **DAST (Dynamic Testing)** — Deploy container to staging; run OWASP ZAP scan.
-
-5. **Deployment Gate**
-
-* If no critical vulnerabilities → deploy to production.
-
-* Otherwise, rollback with GitHub Action notifications via Slack/email.
-
----
-
-#### **B. Automated Threat Modeling Toolkit**
-
-A web-based interface to automate STRIDE/DREAD analysis.
-
-**Frontend:**
-
-* Form for asset, data flow, trust boundary inputs.
-
-* Visualization of data flows (D3.js graph or Mermaid integration).
-
-* Results table showing threat → risk level → recommended mitigation.
-
-**Backend Logic (Flask):**
-
-* STRIDE mapping logic:
-
-```python
-
-STRIDE_MAP = {
-
-"Data Flow Crossing Boundary": ["Tampering", "Information Disclosure"],
-
-"Authentication Component": ["Spoofing", "Elevation of Privilege"]
-
-}
-
+### Backend Development
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+flask db upgrade
+python run.py
 ```
 
-* DREAD scoring:
-
-```python
-
-def calculate_dread(threat):
-
-score = (threat["damage"] + threat["reproducibility"] + threat["exploitability"] +
-
-threat["affected_users"] + threat["discoverability"]) / 5
-
-return "High" if score > 7 else "Medium" if score > 4 else "Low"
-
+### Frontend Development
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-* JSON output → visual risk dashboard.
+### Database Migrations
+```bash
+# Create migration
+flask db migrate -m "Description"
 
----
+# Apply migration
+flask db upgrade
 
-#### **C. Secure Requirements Management Portal**
+# Rollback migration
+flask db downgrade
+```
 
-* Create, read, update, delete requirements.
+## 🧪 Testing
 
-* Each functional requirement must have at least one linked security control.
+### Backend Tests
+```bash
+cd backend
+pytest
+```
 
-* Admin dashboard to audit compliance with OWASP ASVS.
+### Frontend Tests
+```bash
+cd frontend
+npm test
+```
 
-* Export security mapping as CSV/JSON for documentation.
+## 🔒 Security Features
 
----
+- **Input Validation**: Marshmallow schemas, Zod validation
+- **SQL Injection Prevention**: Parameterized queries, SQLAlchemy ORM
+- **XSS Prevention**: Output encoding, Content Security Policy
+- **Authentication**: JWT tokens with refresh mechanism
+- **Authorization**: Role-based access control (RBAC)
+- **Rate Limiting**: Flask-Limiter for API protection
+- **Secrets Management**: Environment variables, secure storage
+- **HTTPS**: HSTS headers, secure cookies
+- **GDPR Compliance**: Data retention policies, user data management
 
-### **4. Security-by-Design Implementation**
+## 📊 API Endpoints
 
-Follow **OWASP ASVS**, **NIST SP 800-218 (SSDF)**, and **Secure Coding Principles**:
+### Authentication
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - Login user
+- `GET /api/auth/github` - GitHub OAuth initiation
+- `GET /api/auth/github/callback` - GitHub OAuth callback
+- `POST /api/auth/refresh` - Refresh access token
+- `POST /api/auth/logout` - Logout user
+- `GET /api/auth/profile` - Get user profile
 
-* Input validation & output encoding.
+### Threat Modeling
+- `POST /api/threats/analyze` - Analyze threat (with auto-scoring)
+- `GET /api/threats` - List all threats
+- `GET /api/threats/{id}` - Get threat details
+- `PUT /api/threats/{id}` - Update threat
+- `DELETE /api/threats/{id}` - Delete threat
+- `GET /api/threats/analytics` - Threat statistics
+- `GET /api/threats/{id}/similar` - Find similar threats
+- `GET /api/threats/{id}/vulnerabilities` - Get linked vulnerabilities
+- `POST /api/threats/{id}/link-vulnerability` - Link vulnerability to threat
+- `GET /api/threats/templates` - List threat templates
+- `POST /api/threats/templates/{id}/create-threat` - Create threat from template
 
-* Use prepared statements and ORM.
+### Requirements Management
+- `GET /api/requirements` - List all requirements
+- `POST /api/requirements` - Create requirement
+- `GET /api/requirements/{id}` - Get requirement details
+- `PUT /api/requirements/{id}` - Update requirement
+- `DELETE /api/requirements/{id}` - Delete requirement
+- `GET /api/requirements/{id}/controls` - Get security controls
+- `POST /api/requirements/{id}/controls` - Add security control
+- `GET /api/requirements/export` - Export requirements
+- `GET /api/requirements/compliance` - Compliance dashboard (Admin only)
 
-* Principle of Least Privilege for users and APIs.
+### CI/CD Dashboard
+- `GET /api/cicd/runs` - List CI/CD runs
+- `GET /api/cicd/runs/{id}` - Get run details
+- `POST /api/cicd/trigger` - Trigger CI/CD run
+- `GET /api/cicd/dashboard` - Dashboard statistics
+- `GET /api/cicd/scans/sonarqube/latest` - Latest SonarQube scan
+- `GET /api/cicd/scans/zap/latest` - Latest ZAP scan
+- `GET /api/cicd/scans/trivy/latest` - Latest Trivy scan
 
-* Secure secrets management using `.env` with GitHub secrets.
+### API Tokens (Admin Only)
+- `POST /api/auth/api-tokens` - Create API token
+- `GET /api/auth/api-tokens` - List API tokens
+- `POST /api/auth/api-tokens/{id}/revoke` - Revoke API token
 
-* HTTPS enforced with HSTS headers.
+## 🛠️ Technology Stack
 
-* Code signing for container images.
-
----
-
-### **5. Tooling and Environment**
-
-| Category | Tool |
-
-| ---------------- | --------------------------------------------- |
-
-| IDE | VS Code |
-
-| Package Managers | npm, pip |
-
-| Version Control | Git + GitHub |
-
-| CI/CD | GitHub Actions |
-
+| Category | Technology |
+|----------|-----------|
+| Frontend Framework | React 19, Vite 7 |
+| Backend Framework | Flask 3.0, Flask-RESTful |
+| Database | PostgreSQL 15 |
+| State Management | Zustand |
+| Styling | Tailwind CSS |
+| Visualization | ReactFlow, Recharts |
+| Authentication | JWT, GitHub OAuth |
+| Security Scanning | SonarQube, OWASP ZAP, Trivy |
 | Containerization | Docker, Docker Compose |
+| CI/CD | GitHub Actions |
+| Testing | PyTest, Jest |
+| Linting | ESLint, Prettier, flake8, bandit, black, mypy |
 
-| Security Testing | SonarQube, Trivy, OWASP ZAP |
+## 📈 Advanced Threat Modeling Features
 
-| Linters | ESLint, Prettier, flake8, bandit, black, mypy |
+### Pattern Recognition
+- 14 pre-defined threat patterns covering OWASP Top 10
+- Regex-based pattern matching
+- Confidence scoring for each pattern
+- Component-aware detection
 
-| Documentation | Swagger (Flask-Swagger), Markdown docs |
+### Automated DREAD Scoring
+- Pattern-based score suggestions
+- Context-aware adjustments
+- Confidence indicators
+- Manual override capability
+- Explanations for each score
 
-| Testing | PyTest (backend), Jest (frontend) |
+### Enhanced Mitigations
+- Pattern-specific recommendations
+- Component-specific mitigations
+- Risk-level prioritized actions
+- Effectiveness ratings
+- Difficulty indicators
+
+### Visualization
+- **Threat Diagrams**: Interactive data flow visualization
+- **Threat Matrix**: STRIDE vs Asset heatmap
+- **Vulnerability Correlation**: Visual threat-vulnerability relationships
+- **Analytics Dashboard**: Comprehensive threat statistics
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- OWASP for security guidelines and methodologies
+- Microsoft for STRIDE threat modeling framework
+- All open-source contributors and libraries used in this project
+
+## 📞 Support
+
+For issues, questions, or contributions, please open an issue on GitHub.
 
 ---
 
-### **6. Deliverables**
-
-1. Complete full-stack application (React + Flask + PostgreSQL).
-
-2. Automated CI/CD pipeline with integrated security scans.
-
-3. Threat Modeling web tool (STRIDE/DREAD implementation).
-
-4. Requirements Management portal with enforced security mappings.
-
-5. Security and Compliance Documentation:
-
-* Secure coding checklist (OWASP ASVS alignment).
-
-* Architecture threat model.
-
-* Security test results from CI/CD.
-
----
-
-### **7. Bonus Enhancements**
-
-* Role-based dashboards with analytics (using Recharts).
-
-* Integration with Slack or email for security alerts.
-
-* Infrastructure-as-Code with Terraform for reproducible environments.
-
-* API Gateway authentication (JWT + API key).
-
-understand the requirmeent and develop this project in proper way with beautiful UI (story-telling interface and sliding) you cna upgrade the requirement and add any additional thing give me suggestions and ask me questions.
-
-
-### Questions:
-1. Database Choice:
-
-    Your proposal specifies PostgreSQL, but the current stack uses MongoDB
-    Should I proceed with MongoDB (already set up) or would you prefer PostgreSQL?
-
-2. Security Tool Integrations:
-
-    SonarQube, Trivy, OWASP ZAP require external services/API keys
-    Should I mock these integrations for the MVP, or do you have access keys?
-    Alternative: I can create a working demo with real security scanning using available tools
-
-3. CI/CD Pipeline:
-
-    GitHub Actions requires repository setup
-    Should I create the configuration files for CI/CD, or focus on the core web application first?
-
-4. UI/UX Design Direction:
-
-    Cybersecurity/Professional theme: Dark mode with tech-focused colors (electric blue, cyber green accents)?
-    Modern/Clean theme: Light mode with professional palette?
-    Storytelling interface: Guided onboarding with animated transitions between sections?
-
-5. Authentication:
-
-    JWT-based auth (I'll implement)
-    Need any OAuth integration (Google, GitHub)?
-
-6. Priority Features for MVP: Should I focus on all three modules equally, or prioritize:
-
-    Threat Modeling Tool first?
-    Requirements Management Portal first?
-    CI/CD Dashboard first?
-
-
-### Answers:
-
-
-1. yes proceed with mongodb
-
-2. I will provide you the api keys and service keys please do the real implementation of Trivy, OWASP ZAP I'll add the service keys in .env
-
-3. create configuration file of CI/CD pipeline I'll add the github myself
-
-4.Cybersecurity theme with storytelling interface
-
-5. JWT-auth and Github
-
-6. implement all three and focus on all three equally.
-
-
-### Questions: 
-1. GitHub OAuth App:
-
-    GitHub Client ID1. I added this as callback URL "http://localhost:3000/callback" tell me if it is correct
-
-Github Client ID = Ov23lieg9w2gMDLzoa2v
-
-Github Client Secret = 5ed...26f
-
-2. We can run them locally using docker contianer
-
-3. lets not use slack or email for now.
-
-4. Automatically trigger on every commit also yes follow proper GDPR compliance.
-    GitHub Client Secret (Create at: GitHub Settings → Developer Settings → OAuth Apps)
-
-2. Security Scanning Tools:
-
-    Do you have Trivy installed locally, or need cloud-based scanning?
-    OWASP ZAP - Will run locally in Docker or need API credentials?
-    SonarQube - Cloud (sonarcloud.io) token or local setup?
-
-3. Additional Services (Optional):
-
-    Slack webhook URL (for CI/CD notifications)?
-    Email service credentials (for security alerts)?
-
-4. Quick Confirmation:
-
-    Should security scans run automatically on every commit or manual trigger only?
-    Any specific compliance requirements (GDPR, HIPAA, PCI-DSS)?
-
-### Answers:
-1. Guide me how to create one github app.
-
-2. We can run them locally using docker contianer
-
-3. lets not use slack or email for now.
-
-4. Automatically trigger on every commit also yes follow proper GDPR compliance.
+**Project Sentinel** - Building secure software, one threat at a time 🛡️

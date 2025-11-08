@@ -1,0 +1,108 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: sentinal-postgres
+    env_file:
+      - .docker.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sentinal}
+      POSTGRES_USER: ${POSTGRES_USER:-sentinal_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # No external port mapping - containers communicate internally
+    # Access via: docker compose exec postgres psql -U sentinal_user -d sentinal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentinal_user} -d ${POSTGRES_DB:-sentinal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sentinal-backend
+    env_file:
+      - .docker.env
+    environment:
+      FLASK_ENV: ${FLASK_ENV:-production}
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      POSTGRES_DB: ${POSTGRES_DB:-sentinal}
+      POSTGRES_USER: ${POSTGRES_USER:-sentinal_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITHUB_CALLBACK_URL: ${GITHUB_CALLBACK_URL:-http://localhost/callback}
+      TRIVY_API_URL: ${TRIVY_API_URL:-http://trivy:8080}
+      OWASP_ZAP_API_URL: ${OWASP_ZAP_API_URL:-http://zap:8090}
+      SONARQUBE_URL: ${SONARQUBE_URL:-http://sonarqube:9000}
+      SONARQUBE_TOKEN: ${SONARQUBE_TOKEN}
+      SONARQUBE_PROJECT_KEY: ${SONARQUBE_PROJECT_KEY:-sentinal}
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/logs:/app/logs
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sentinal-frontend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost/api}
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  trivy:
+    image: aquasec/trivy:latest
+    container_name: sentinal-trivy
+    command: server --listen 0.0.0.0:8080
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: sentinal-zap
+    command: zap.sh -daemon -host 0.0.0.0 -port 8090 -config api.disablekey=true -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8090/JSON/core/view/version/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: sentinal-sonarqube
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: true
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+
