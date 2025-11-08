@@ -1,4 +1,5 @@
 """Threat template API endpoints."""
+
 from flask import request
 from flask_restful import Resource
 from app.core.security import jwt_required
@@ -15,14 +16,14 @@ class ThreatTemplateList(Resource):
     @jwt_required()
     def get(self):
         """Get all threat templates."""
-        category = request.args.get('category')
+        category = request.args.get("category")
         query = ThreatTemplate.query
 
         if category:
             query = query.filter_by(category=category)
 
         templates = query.order_by(ThreatTemplate.name).all()
-        return {'templates': [t.to_dict() for t in templates]}, 200
+        return {"templates": [t.to_dict() for t in templates]}, 200
 
 
 class ThreatTemplateDetail(Resource):
@@ -32,7 +33,7 @@ class ThreatTemplateDetail(Resource):
     def get(self, template_id):
         """Get threat template details."""
         template = ThreatTemplate.query.get_or_404(template_id)
-        return {'template': template.to_dict()}, 200
+        return {"template": template.to_dict()}, 200
 
 
 class CreateThreatFromTemplate(Resource):
@@ -45,14 +46,14 @@ class CreateThreatFromTemplate(Resource):
         data = request.json or {}
 
         # Use template values, allow overrides
-        asset = data.get('asset') or template.asset_type or 'Unknown Asset'
-        flow = data.get('flow') or template.flow_template
-        trust_boundary = data.get('trust_boundary') or template.trust_boundary_template
+        asset = data.get("asset") or template.asset_type or "Unknown Asset"
+        flow = data.get("flow") or template.flow_template
+        trust_boundary = data.get("trust_boundary") or template.trust_boundary_template
 
         # Use advanced STRIDE analysis
         engine = STRIDEEngine()
         advanced_analysis = engine.analyze_threat_advanced(asset, flow, trust_boundary)
-        stride_categories = advanced_analysis['stride_categories']
+        stride_categories = advanced_analysis["stride_categories"]
 
         # Use template DREAD scores or auto-score
         dread_scorer = DREADScorer()
@@ -60,11 +61,11 @@ class CreateThreatFromTemplate(Resource):
             dread_scores = template.default_dread_scores
         else:
             dread_suggestions = dread_scorer.suggest_dread_scores(asset, flow, trust_boundary)
-            dread_scores = dread_suggestions['suggested_scores']
+            dread_scores = dread_suggestions["suggested_scores"]
 
         # Calculate risk level
         total_score = sum(dread_scores.values()) / 5.0
-        risk_level = 'High' if total_score > 7 else 'Medium' if total_score > 4 else 'Low'
+        risk_level = "High" if total_score > 7 else "Medium" if total_score > 4 else "Low"
 
         # Get mitigations
         mitigation = template.default_mitigation or engine.get_mitigation_recommendations(stride_categories, risk_level)
@@ -77,18 +78,18 @@ class CreateThreatFromTemplate(Resource):
             stride_categories=stride_categories,
             dread_score=dread_scores,
             risk_level=risk_level,
-            mitigation=mitigation
+            mitigation=mitigation,
         )
 
         db.session.add(threat)
         db.session.commit()
 
         return {
-            'threat': threat.to_dict(),
-            'analysis': {
-                'stride_categories': stride_categories,
-                'dread_score': total_score,
-                'risk_level': risk_level,
-                'mitigation': mitigation
-            }
+            "threat": threat.to_dict(),
+            "analysis": {
+                "stride_categories": stride_categories,
+                "dread_score": total_score,
+                "risk_level": risk_level,
+                "mitigation": mitigation,
+            },
         }, 201

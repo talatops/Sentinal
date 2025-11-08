@@ -1,4 +1,5 @@
 """Threat similarity detection service."""
+
 from typing import List, Dict, Any
 from app.models.threat import Threat
 from app.services.threat_patterns import match_threat_patterns
@@ -25,40 +26,29 @@ class ThreatSimilarityService:
         all_threats = Threat.query.filter(Threat.id != threat_id).all()
         similarities = []
 
-        target_patterns = match_threat_patterns(
-            target_threat.asset,
-            target_threat.flow,
-            target_threat.trust_boundary
-        )
+        target_patterns = match_threat_patterns(target_threat.asset, target_threat.flow, target_threat.trust_boundary)
         target_pattern_names = {name for name, _, _ in target_patterns}
         target_stride = set(target_threat.stride_categories or [])
 
         for threat in all_threats:
-            similarity_score = self._calculate_similarity(
-                target_threat,
-                threat,
-                target_pattern_names,
-                target_stride
-            )
+            similarity_score = self._calculate_similarity(target_threat, threat, target_pattern_names, target_stride)
 
             if similarity_score > 0:
-                similarities.append({
-                    'threat': threat.to_dict(),
-                    'similarity_score': round(similarity_score, 2),
-                    'similarity_percentage': round(similarity_score * 100, 1)
-                })
+                similarities.append(
+                    {
+                        "threat": threat.to_dict(),
+                        "similarity_score": round(similarity_score, 2),
+                        "similarity_percentage": round(similarity_score * 100, 1),
+                    }
+                )
 
         # Sort by similarity score (highest first)
-        similarities.sort(key=lambda x: x['similarity_score'], reverse=True)
+        similarities.sort(key=lambda x: x["similarity_score"], reverse=True)
 
         return similarities[:limit]
 
     def _calculate_similarity(
-        self,
-        target: Threat,
-        candidate: Threat,
-        target_patterns: set,
-        target_stride: set
+        self, target: Threat, candidate: Threat, target_patterns: set, target_stride: set
     ) -> float:
         """Calculate similarity score between two threats (0-1)."""
         score = 0.0
@@ -81,11 +71,7 @@ class ThreatSimilarityService:
         factors += 1
 
         # Factor 3: Pattern matching similarity
-        candidate_patterns = match_threat_patterns(
-            candidate.asset,
-            candidate.flow,
-            candidate.trust_boundary
-        )
+        candidate_patterns = match_threat_patterns(candidate.asset, candidate.flow, candidate.trust_boundary)
         candidate_pattern_names = {name for name, _, _ in candidate_patterns}
         pattern_intersection = target_patterns.intersection(candidate_pattern_names)
         pattern_union = target_patterns.union(candidate_pattern_names)
@@ -95,7 +81,7 @@ class ThreatSimilarityService:
         factors += 1
 
         # Factor 4: Risk level similarity
-        risk_levels = {'Low': 1, 'Medium': 2, 'High': 3}
+        risk_levels = {"Low": 1, "Medium": 2, "High": 3}
         target_risk = risk_levels.get(target.risk_level, 2)
         candidate_risk = risk_levels.get(candidate.risk_level, 2)
         risk_diff = abs(target_risk - candidate_risk)
@@ -106,7 +92,7 @@ class ThreatSimilarityService:
         # Factor 5: DREAD score similarity
         target_dread = target.dread_score or {}
         candidate_dread = candidate.dread_score or {}
-        dread_keys = ['damage', 'reproducibility', 'exploitability', 'affected_users', 'discoverability']
+        dread_keys = ["damage", "reproducibility", "exploitability", "affected_users", "discoverability"]
         dread_similarities = []
         for key in dread_keys:
             target_val = target_dread.get(key, 5)

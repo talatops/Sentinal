@@ -2,6 +2,39 @@
 
 A comprehensive DevSecOps platform integrating Security-by-Design principles into every stage of the Software Development Lifecycle (SDLC). Project Sentinel provides automated threat modeling, security requirements management, and CI/CD pipeline security scanning.
 
+## 📑 Table of Contents
+
+- [Repository Structure](#-repository-structure)
+- [Features](#-features)
+- [Architecture](#️-architecture)
+- [Quick Start](#-quick-start)
+- [Documentation](#-documentation)
+- [Development](#-development)
+- [Testing](#-testing)
+- [Code Quality](#-code-quality)
+- [Security Features](#-security-features)
+- [API Endpoints](#-api-endpoints)
+- [Technology Stack](#️-technology-stack)
+- [Advanced Threat Modeling Features](#-advanced-threat-modeling-features)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Acknowledgments](#-acknowledgments)
+- [Support](#-support)
+
+## 📦 Repository Structure
+
+This is a **monorepo** containing both backend and frontend applications:
+
+### Backend (`/backend`)
+- **Purpose**: RESTful API server providing threat modeling, requirements management, and CI/CD integration services
+- **Technology**: Python 3.11, Flask 3.0, PostgreSQL 15
+- **Key Features**: JWT authentication, WebSocket support, security scanning integrations (SonarQube, ZAP, Trivy)
+
+### Frontend (`/frontend`)
+- **Purpose**: Modern web application providing an intuitive UI for threat modeling, requirements management, and CI/CD dashboard
+- **Technology**: React 19, Vite 7, Tailwind CSS
+- **Key Features**: Real-time updates, interactive visualizations, cybersecurity-themed design
+
 ## ✨ Features
 
 ### 🔐 Advanced Threat Modeling Toolkit
@@ -152,6 +185,24 @@ pytest
 cd frontend
 npm test
 ```
+
+## 🔍 Code Quality
+
+### Backend Code Quality Checks
+
+Run linting and formatting checks for Python code:
+
+```bash
+# Check code style with flake8
+cd backend
+flake8 app/
+
+# Check code formatting with black
+cd backend
+black --check app/
+```
+
+**Note**: Configuration files (`.flake8` and `pyproject.toml`) are automatically used by these tools. The CI/CD pipeline runs these checks automatically on every commit.
 
 ## 🔒 Security Features
 
