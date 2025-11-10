@@ -14,7 +14,7 @@ class APIToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)  # e.g., "GitHub Actions CI/CD"
     token_hash = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    token_prefix = db.Column(db.String(10), nullable=False)  # First 8 chars for display
+    token_prefix = db.Column(db.String(15), nullable=False)  # "sent_" + up to 10 chars
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=True)  # None = never expires
     last_used_at = db.Column(db.DateTime, nullable=True)

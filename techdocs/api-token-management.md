@@ -4,6 +4,12 @@
 
 Create a secure API token system for authenticating GitHub Actions webhooks and other external integrations. This will allow GitHub Actions to securely send scan results to the dashboard.
 
+**Token Format:**
+- Tokens are prefixed with `sent_` followed by a 32-byte URL-safe random string
+- Token prefix (first 12 characters: `sent_` + 7 chars) is stored in the database for identification
+- Full tokens are only shown once during creation and are never stored in plaintext
+- Tokens are hashed using SHA-256 before storage
+
 ## Architecture
 
 ### Components Needed:
@@ -24,7 +30,7 @@ Create a secure API token system for authenticating GitHub Actions webhooks and 
 
 ```python
 """API Token model for webhook authentication."""
-from datetime import datetime, timedelta
+from datetime import datetime
 from app import db
 import secrets
 import hashlib
@@ -36,7 +42,7 @@ class APIToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)  # e.g., "GitHub Actions CI/CD"
     token_hash = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    token_prefix = db.Column(db.String(10), nullable=False)  # First 8 chars for display
+    token_prefix = db.Column(db.String(15), nullable=False)  # "sent_" + up to 10 chars (12 chars total)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=True)  # None = never expires
     last_used_at = db.Column(db.DateTime, nullable=True)
@@ -48,16 +54,16 @@ class APIToken(db.Model):
     creator = db.relationship('User', backref='api_tokens')
     
     @staticmethod
-    def generate_token() -> tuple[str, str]:
+    def generate_token() -> tuple:
         """Generate a new API token.
         
         Returns:
             tuple: (full_token, token_hash, token_prefix)
         """
-        # Generate 32-byte random token
-        token = secrets.token_urlsafe(32)
+        # Generate 32-byte random token with prefix
+        token = f"sent_{secrets.token_urlsafe(32)}"
         token_hash = hashlib.sha256(token.encode()).hexdigest()
-        token_prefix = token[:8]
+        token_prefix = token[:12]  # "sent_" + 7 chars = 12 chars total
         return token, token_hash, token_prefix
     
     @staticmethod
@@ -117,8 +123,9 @@ class APIToken(db.Model):
 """API Token management endpoints."""
 from flask import request
 from flask_restful import Resource
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from marshmallow import Schema, fields, ValidationError
+from flask_jwt_extended import get_jwt_identity
+from app.core.security import jwt_required
+from marshmallow import Schema, fields, ValidationError, validate
 from app import db
 from app.models.api_token import APIToken
 from app.models.user import User
@@ -127,7 +134,7 @@ from datetime import datetime, timedelta
 class CreateTokenSchema(Schema):
     """Schema for creating API token."""
     name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    expires_in_days = fields.Int(missing=None)  # None = never expires
+    expires_in_days = fields.Int(missing=None, allow_none=True)  # None = never expires
     scopes = fields.List(fields.Str(), missing=['webhook:write'])
 
 class CreateAPIToken(Resource):
@@ -333,7 +340,17 @@ Content-Type: application/json
 Response:
 {
   "token": "sent_abc123xyz...",
-  "token_info": {...}
+  "token_info": {
+    "id": 1,
+    "name": "GitHub Actions CI/CD",
+    "token_prefix": "sent_abc1",
+    "created_by": 1,
+    "expires_at": "2026-11-10T13:00:00",
+    "last_used_at": null,
+    "is_active": true,
+    "scopes": ["webhook:write"],
+    "created_at": "2025-11-10T13:00:00"
+  }
 }
 ```
 
@@ -381,48 +398,49 @@ Response:
 ## Security Features
 
 1. **Token Hashing:** Tokens stored as SHA-256 hashes (never plaintext)
-2. **Token Prefix:** Only first 8 chars shown in UI (for identification)
-3. **Expiration:** Optional expiration dates
+2. **Token Prefix:** Tokens prefixed with `sent_` followed by 7 characters (12 chars total shown in UI for identification)
+3. **Expiration:** Optional expiration dates (set via `expires_in_days` parameter)
 4. **Scopes:** Fine-grained permissions (webhook:write, webhook:read)
-5. **Revocation:** Tokens can be revoked without deletion
-6. **Last Used Tracking:** Monitor token usage
+5. **Revocation:** Tokens can be revoked without deletion (sets `is_active=False`)
+6. **Last Used Tracking:** Monitor token usage via `last_used_at` field
 7. **Rate Limiting:** Apply rate limits to webhook endpoints
 8. **Admin Only:** Only admins can create/manage tokens
 
 ---
 
-## Database Migration
+## Database Migrations
+
+### Initial Migration: `002_add_api_tokens.py`
 
 **File:** `backend/migrations/versions/002_add_api_tokens.py`
 
+Creates the initial `api_tokens` table with `token_prefix` as `VARCHAR(10)`.
+
+### Column Size Update: `005_increase_token_prefix_length.py`
+
+**File:** `backend/migrations/versions/005_increase_token_prefix_length.py`
+
+Updates the `token_prefix` column from `VARCHAR(10)` to `VARCHAR(15)` to accommodate the full token prefix format (`sent_` + 7 chars = 12 chars total).
+
 ```python
-"""Add API tokens table."""
+"""Increase token_prefix column length."""
 from alembic import op
 import sqlalchemy as sa
 
 def upgrade():
-    op.create_table(
-        'api_tokens',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(length=100), nullable=False),
-        sa.Column('token_hash', sa.String(length=255), nullable=False),
-        sa.Column('token_prefix', sa.String(length=10), nullable=False),
-        sa.Column('created_by', sa.Integer(), nullable=False),
-        sa.Column('expires_at', sa.DateTime(), nullable=True),
-        sa.Column('last_used_at', sa.DateTime(), nullable=True),
-        sa.Column('is_active', sa.Boolean(), nullable=False),
-        sa.Column('scopes', sa.String(length=255), nullable=False),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(['created_by'], ['users.id']),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('token_hash')
-    )
-    op.create_index(op.f('ix_api_tokens_token_hash'), 'api_tokens', ['token_hash'], unique=True)
+    op.alter_column('api_tokens', 'token_prefix',
+                    existing_type=sa.String(length=10),
+                    type_=sa.String(length=15),
+                    existing_nullable=False)
 
 def downgrade():
-    op.drop_index(op.f('ix_api_tokens_token_hash'), table_name='api_tokens')
-    op.drop_table('api_tokens')
+    op.alter_column('api_tokens', 'token_prefix',
+                    existing_type=sa.String(length=15),
+                    type_=sa.String(length=10),
+                    existing_nullable=False)
 ```
+
+**Note:** This migration was added to fix an issue where the token generation creates 12-character prefixes but the original column only allowed 10 characters.
 
 ---
 
@@ -467,24 +485,25 @@ def webhook_auth_required(f):
 ## Implementation Checklist
 
 ### Backend:
-- [ ] Create `APIToken` model
-- [ ] Create migration for `api_tokens` table
-- [ ] Create token management API endpoints
-- [ ] Create webhook authentication middleware
-- [ ] Add webhook endpoints with authentication
-- [ ] Add rate limiting for webhooks
-- [ ] Add logging for token usage
+- [x] Create `APIToken` model (`backend/app/models/api_token.py`)
+- [x] Create migration for `api_tokens` table (`002_add_api_tokens.py`)
+- [x] Create migration to increase token_prefix column size (`005_increase_token_prefix_length.py`)
+- [x] Create token management API endpoints (`backend/app/api/api_tokens.py`)
+- [x] Create webhook authentication middleware (`backend/app/core/webhook_auth.py`)
+- [x] Add webhook endpoints with authentication (`backend/app/api/cicd.py`)
+- [x] Add rate limiting for webhooks (via Flask-Limiter)
+- [x] Add logging for token usage (`last_used_at` tracking)
 
-### Frontend (Optional):
-- [ ] Create API Tokens management page
-- [ ] Add token creation form
-- [ ] Add token list with revoke functionality
-- [ ] Add copy-to-clipboard functionality
+### Frontend:
+- [x] Create API Tokens management page (`frontend/src/pages/APITokens.jsx`)
+- [x] Add token creation form
+- [x] Add token list with revoke functionality
+- [x] Add copy-to-clipboard functionality
 
 ### Documentation:
-- [ ] Document token creation process
-- [ ] Document GitHub Actions integration
-- [ ] Document security best practices
+- [x] Document token creation process
+- [x] Document GitHub Actions integration
+- [x] Document security best practices
 
 ---
 
