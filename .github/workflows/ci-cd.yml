@@ -91,10 +91,15 @@ jobs:
             sleep 2
           done
       
+      - name: Create test database
+        run: |
+          PGPASSWORD=test_password psql -h localhost -U test_user -d postgres -c "CREATE DATABASE test_sentinal;" || echo "Database may already exist"
+      
       - name: Run database migrations
         working-directory: ./backend
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost/test_sentinal
+          TEST_DATABASE_URL: postgresql://test_user:test_password@localhost/test_sentinal
           SECRET_KEY: test_secret_key_32_characters_long
           JWT_SECRET_KEY: test_jwt_secret_key_32_characters_long
           FLASK_ENV: testing

@@ -61,7 +61,11 @@ class TestingConfig(Config):
     """Testing configuration."""
 
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = "postgresql://test_user:test_pass@localhost/test_sentinal"
+    SQLALCHEMY_DATABASE_URI = (
+        os.environ.get("TEST_DATABASE_URL")
+        or os.environ.get("DATABASE_URL")
+        or "postgresql://test_user:test_pass@localhost/test_sentinal"
+    )
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 5
 
 
