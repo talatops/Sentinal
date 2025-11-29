@@ -5,7 +5,7 @@ from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 import json
 from datetime import datetime
 from functools import wraps
-from flask import request, jsonify, current_app
+from flask import request, current_app
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
 from flask_jwt_extended.exceptions import NoAuthorizationError, JWTDecodeError
 from app.models.user import User
