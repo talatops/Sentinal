@@ -77,9 +77,10 @@ def create_app(config_name="production"):
     limiter.init_app(app)
 
     # Configure logging
-    if not app.debug and not app.config.get('TESTING', False):
+    if not app.debug and not app.config.get("TESTING", False):
         # Create logs directory if it doesn't exist
         import os
+
         logs_dir = "logs"
         if not os.path.exists(logs_dir):
             os.makedirs(logs_dir, exist_ok=True)
