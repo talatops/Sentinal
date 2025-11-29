@@ -102,10 +102,10 @@ def role_required(required_role: str):
             user = User.query.get(user_id)
 
             if not user:
-                return jsonify({"error": "User not found"}), 404
+                return {"error": "User not found"}, 404
 
             if user.role != required_role and user.role != "Admin":
-                return jsonify({"error": "Insufficient permissions"}), 403
+                return {"error": "Insufficient permissions"}, 403
 
             return f(*args, **kwargs)
 

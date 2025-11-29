@@ -188,7 +188,8 @@ def test_api_token_to_dict(app, db_session, admin_user):
             name='Test Token',
             token_hash='hashed_token',
             token_prefix='sent_test',
-            created_by=user.id
+            created_by=user.id,
+            scopes='webhook:write,webhook:read'  # scopes is NOT NULL
         )
         db_session.add(token)
         db_session.commit()

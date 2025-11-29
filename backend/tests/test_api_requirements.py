@@ -45,7 +45,8 @@ def test_create_requirement_missing_controls(client, auth_headers):
     
     assert response.status_code == 400
     data = json.loads(response.data)
-    assert 'error' in data
+    # API returns 'errors' from marshmallow validation or 'error' from custom check
+    assert 'error' in data or 'errors' in data
 
 
 def test_get_requirements(client, auth_headers, test_user, app):
