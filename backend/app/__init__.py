@@ -99,8 +99,9 @@ def create_app(config_name="production"):
     def health():
         return {"status": "healthy", "service": "sentinal-api"}, 200
 
-    # Root API route
+    # Root API route (handle both with and without trailing slash)
     @app.route("/api")
+    @app.route("/api/")
     def api_root():
         return {
             "message": "Project Sentinel API",
