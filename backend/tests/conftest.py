@@ -44,6 +44,12 @@ def test_user(app):
         )
         db.session.add(user)
         db.session.commit()
+        # Store ID while still in session
+        user_id = user.id
+        # Make object transient so it can be used outside session
+        db.session.expunge(user)
+        # Set ID directly on the object
+        object.__setattr__(user, 'id', user_id)
         return user
 
 
@@ -59,6 +65,12 @@ def admin_user(app):
         )
         db.session.add(user)
         db.session.commit()
+        # Store ID while still in session
+        user_id = user.id
+        # Make object transient so it can be used outside session
+        db.session.expunge(user)
+        # Set ID directly on the object
+        object.__setattr__(user, 'id', user_id)
         return user
 
 
@@ -66,7 +78,9 @@ def admin_user(app):
 def auth_headers(app, test_user):
     """Create JWT auth headers for test user."""
     with app.app_context():
-        access_token = create_access_token(identity=test_user.id)
+        # Merge user back into session to access attributes safely
+        user = db.session.merge(test_user)
+        access_token = create_access_token(identity=user.id)
         return {'Authorization': f'Bearer {access_token}'}
 
 
@@ -74,7 +88,9 @@ def auth_headers(app, test_user):
 def admin_headers(app, admin_user):
     """Create JWT auth headers for admin user."""
     with app.app_context():
-        access_token = create_access_token(identity=admin_user.id)
+        # Merge user back into session to access attributes safely
+        user = db.session.merge(admin_user)
+        access_token = create_access_token(identity=user.id)
         return {'Authorization': f'Bearer {access_token}'}
 
 

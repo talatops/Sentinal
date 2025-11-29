@@ -1,4 +1,5 @@
 """Test database models."""
+from app import db
 from app.models.user import User
 from app.models.threat import Threat
 from app.models.requirement import Requirement
@@ -28,13 +29,16 @@ def test_user_model(app, db_session):
 
 def test_user_to_dict(app, test_user):
     """Test User to_dict method."""
-    user_dict = test_user.to_dict()
-    
-    assert 'id' in user_dict
-    assert 'username' in user_dict
-    assert 'email' in user_dict
-    assert 'role' in user_dict
-    assert 'password_hash' not in user_dict  # Should not expose password
+    with app.app_context():
+        # Merge user back into session to access attributes
+        user = db.session.merge(test_user)
+        user_dict = user.to_dict()
+        
+        assert 'id' in user_dict
+        assert 'username' in user_dict
+        assert 'email' in user_dict
+        assert 'role' in user_dict
+        assert 'password_hash' not in user_dict  # Should not expose password
 
 
 def test_threat_model(app, db_session):
@@ -82,36 +86,42 @@ def test_threat_to_dict(app, db_session):
 
 def test_requirement_model(app, db_session, test_user):
     """Test Requirement model."""
-    requirement = Requirement(
-        title='Test Requirement',
-        description='Test description',
-        security_controls=['MFA', 'Encryption'],
-        created_by=test_user.id,
-        status='Draft'
-    )
-    db_session.add(requirement)
-    db_session.commit()
-    
-    assert requirement.id is not None
-    assert requirement.title == 'Test Requirement'
-    assert requirement.status == 'Draft'
-    assert len(requirement.security_controls) == 2
+    with app.app_context():
+        # Merge user back into session to access ID
+        user = db.session.merge(test_user)
+        requirement = Requirement(
+            title='Test Requirement',
+            description='Test description',
+            security_controls=['MFA', 'Encryption'],
+            created_by=user.id,
+            status='Draft'
+        )
+        db_session.add(requirement)
+        db_session.commit()
+        
+        assert requirement.id is not None
+        assert requirement.title == 'Test Requirement'
+        assert requirement.status == 'Draft'
+        assert len(requirement.security_controls) == 2
 
 
 def test_requirement_to_dict(app, db_session, test_user):
     """Test Requirement to_dict method."""
-    requirement = Requirement(
-        title='Test Requirement',
-        security_controls=['MFA'],
-        created_by=test_user.id
-    )
-    db_session.add(requirement)
-    db_session.commit()
-    
-    req_dict = requirement.to_dict()
-    assert 'id' in req_dict
-    assert 'title' in req_dict
-    assert 'status' in req_dict
+    with app.app_context():
+        # Merge user back into session to access ID
+        user = db.session.merge(test_user)
+        requirement = Requirement(
+            title='Test Requirement',
+            security_controls=['MFA'],
+            created_by=user.id
+        )
+        db_session.add(requirement)
+        db_session.commit()
+        
+        req_dict = requirement.to_dict()
+        assert 'id' in req_dict
+        assert 'title' in req_dict
+        assert 'status' in req_dict
 
 
 def test_cicd_run_model(app, db_session):
@@ -150,36 +160,42 @@ def test_cicd_run_to_dict(app, db_session):
 
 def test_api_token_model(app, db_session, admin_user):
     """Test APIToken model."""
-    token = APIToken(
-        name='Test Token',
-        token_hash='hashed_token_value',
-        token_prefix='sent_abc123',
-        created_by=admin_user.id,
-        scopes=['webhook:write']
-    )
-    db_session.add(token)
-    db_session.commit()
-    
-    assert token.id is not None
-    assert token.name == 'Test Token'
-    assert token.is_active is True
-    assert 'webhook:write' in token.scopes
+    with app.app_context():
+        # Merge user back into session to access ID
+        user = db.session.merge(admin_user)
+        token = APIToken(
+            name='Test Token',
+            token_hash='hashed_token_value',
+            token_prefix='sent_abc123',
+            created_by=user.id,
+            scopes=['webhook:write']
+        )
+        db_session.add(token)
+        db_session.commit()
+        
+        assert token.id is not None
+        assert token.name == 'Test Token'
+        assert token.is_active is True
+        assert 'webhook:write' in token.scopes
 
 
 def test_api_token_to_dict(app, db_session, admin_user):
     """Test APIToken to_dict method."""
-    token = APIToken(
-        name='Test Token',
-        token_hash='hashed_token',
-        token_prefix='sent_test',
-        created_by=admin_user.id
-    )
-    db_session.add(token)
-    db_session.commit()
-    
-    token_dict = token.to_dict()
-    assert 'id' in token_dict
-    assert 'name' in token_dict
-    assert 'token_hash' not in token_dict  # Should not expose hash
-    assert 'is_active' in token_dict
+    with app.app_context():
+        # Merge user back into session to access ID
+        user = db.session.merge(admin_user)
+        token = APIToken(
+            name='Test Token',
+            token_hash='hashed_token',
+            token_prefix='sent_test',
+            created_by=user.id
+        )
+        db_session.add(token)
+        db_session.commit()
+        
+        token_dict = token.to_dict()
+        assert 'id' in token_dict
+        assert 'name' in token_dict
+        assert 'token_hash' not in token_dict  # Should not expose hash
+        assert 'is_active' in token_dict
 
