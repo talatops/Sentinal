@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { cicdService } from '../services/cicdService';
@@ -30,9 +31,9 @@ const TrivyResults = () => {
 
   useEffect(() => {
     loadData();
-  }, [runId, filters.page, filters.per_page]);
+  }, [runId, filters.page, filters.per_page, loadData]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const result = runId
@@ -49,7 +50,7 @@ const TrivyResults = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [runId, filters.page, filters.per_page]);
 
   const toggleRow = (vulnId) => {
     const newExpanded = new Set(expandedRows);
@@ -65,16 +66,6 @@ const TrivyResults = () => {
     setFilters({ ...filters, ...newFilters, page: 1 });
   };
 
-  const getSeverityColor = (severity) => {
-    const colors = {
-      CRITICAL: 'text-red-500',
-      HIGH: 'text-orange-500',
-      MEDIUM: 'text-yellow-500',
-      LOW: 'text-blue-500',
-      UNKNOWN: 'text-gray-500',
-    };
-    return colors[severity] || 'text-gray-500';
-  };
 
   const getSeverityBg = (severity) => {
     const colors = {
@@ -105,7 +96,6 @@ const TrivyResults = () => {
 
   const vulnerabilities = data.vulnerabilities || [];
   const pagination = data.pagination || { page: 1, per_page: 50, total: vulnerabilities.length, pages: 1 };
-  const metadata = data.metadata || {};
 
   const stats = [
     { name: 'Total Vulnerabilities', value: data.total || 0, icon: ShieldExclamationIcon, color: 'text-cyber-blue' },

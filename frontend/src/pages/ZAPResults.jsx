@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { cicdService } from '../services/cicdService';
@@ -30,9 +31,9 @@ const ZAPResults = () => {
 
   useEffect(() => {
     loadData();
-  }, [runId, filters.page, filters.per_page]);
+  }, [runId, filters.page, filters.per_page, loadData]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const result = runId
@@ -49,7 +50,7 @@ const ZAPResults = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [runId, filters.page, filters.per_page]);
 
   const toggleRow = (alertId) => {
     const newExpanded = new Set(expandedRows);
@@ -65,16 +66,6 @@ const ZAPResults = () => {
     setFilters({ ...filters, ...newFilters, page: 1 });
   };
 
-  const getRiskColor = (risk) => {
-    const colors = {
-      Critical: 'text-red-500',
-      High: 'text-orange-500',
-      Medium: 'text-yellow-500',
-      Low: 'text-blue-500',
-      Informational: 'text-gray-500',
-    };
-    return colors[risk] || 'text-gray-500';
-  };
 
   const getRiskBg = (risk) => {
     const colors = {

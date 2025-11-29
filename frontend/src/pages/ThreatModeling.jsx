@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { threatService } from '../services/threatService';
 import DREADScorer from '../components/DREADScorer';
@@ -16,16 +17,6 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 
-const threatSchema = z.object({
-  asset: z.string().min(1, 'Asset is required'),
-  flow: z.string().min(1, 'Flow description is required'),
-  trust_boundary: z.string().optional(),
-  damage: z.number().min(0).max(10),
-  reproducibility: z.number().min(0).max(10),
-  exploitability: z.number().min(0).max(10),
-  affected_users: z.number().min(0).max(10),
-  discoverability: z.number().min(0).max(10),
-});
 
 // Component to render mitigation recommendations with better styling
 const MitigationList = ({ mitigation, riskLevel }) => {
@@ -146,7 +137,6 @@ const ThreatModeling = () => {
   const [showResultModal, setShowResultModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [currentStep, setCurrentStep] = useState(1);
   const [selectedThreatForDiagram, setSelectedThreatForDiagram] = useState(null);
   const [viewMode, setViewMode] = useState('list'); // 'list', 'diagram', 'matrix'
 

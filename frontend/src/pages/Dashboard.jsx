@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { cicdService } from '../services/cicdService';
@@ -24,36 +25,7 @@ const Dashboard = () => {
     trivy: null,
   });
 
-  useEffect(() => {
-    // Connect to WebSocket
-    wsService.connect();
-    
-    // Subscribe to dashboard updates
-    wsService.on('dashboard_update', handleDashboardUpdate);
-    wsService.on('connected', () => {
-      console.log('WebSocket connected, subscribing to dashboard');
-      wsService.emit('subscribe_dashboard');
-    });
-
-    // Load initial dashboard data
-    loadDashboard();
-
-    // Cleanup on unmount
-    return () => {
-      wsService.off('dashboard_update', handleDashboardUpdate);
-    };
-  }, []);
-
-  const handleDashboardUpdate = (update) => {
-    console.log('Dashboard update received:', update);
-    
-    if (update.type === 'new_run' || update.type === 'scan_completed') {
-      // Reload dashboard data when new run is created or scan completes
-      loadDashboard();
-    }
-  };
-
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
     try {
       const data = await cicdService.getDashboard();
       setDashboardData(data);
@@ -79,7 +51,36 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const handleDashboardUpdate = useCallback((update) => {
+    console.log('Dashboard update received:', update);
+    
+    if (update.type === 'new_run' || update.type === 'scan_completed') {
+      // Reload dashboard data when new run is created or scan completes
+      loadDashboard();
+    }
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    // Connect to WebSocket
+    wsService.connect();
+    
+    // Subscribe to dashboard updates
+    wsService.on('dashboard_update', handleDashboardUpdate);
+    wsService.on('connected', () => {
+      console.log('WebSocket connected, subscribing to dashboard');
+      wsService.emit('subscribe_dashboard');
+    });
+
+    // Load initial dashboard data
+    loadDashboard();
+
+    // Cleanup on unmount
+    return () => {
+      wsService.off('dashboard_update', handleDashboardUpdate);
+    };
+  }, [handleDashboardUpdate, loadDashboard]);
 
   if (loading) {
     return (

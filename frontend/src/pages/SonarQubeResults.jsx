@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { cicdService } from '../services/cicdService';
@@ -32,9 +33,9 @@ const SonarQubeResults = () => {
 
   useEffect(() => {
     loadData();
-  }, [runId, filters.page, filters.per_page]);
+  }, [runId, filters.page, filters.per_page, loadData]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const result = runId
@@ -51,7 +52,7 @@ const SonarQubeResults = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [runId, filters.page, filters.per_page]);
 
   const toggleRow = (issueKey) => {
     const newExpanded = new Set(expandedRows);
@@ -67,16 +68,6 @@ const SonarQubeResults = () => {
     setFilters({ ...filters, ...newFilters, page: 1 });
   };
 
-  const getSeverityColor = (severity) => {
-    const colors = {
-      CRITICAL: 'text-red-500',
-      BLOCKER: 'text-red-600',
-      MAJOR: 'text-orange-500',
-      MINOR: 'text-yellow-500',
-      INFO: 'text-blue-500',
-    };
-    return colors[severity] || 'text-gray-500';
-  };
 
   const getSeverityBg = (severity) => {
     const colors = {
