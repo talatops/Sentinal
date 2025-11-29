@@ -83,7 +83,7 @@ def create_app(config_name="production"):
         logs_dir = "logs"
         if not os.path.exists(logs_dir):
             os.makedirs(logs_dir, exist_ok=True)
-        
+
         file_handler = RotatingFileHandler("logs/sentinal.log", maxBytes=10240000, backupCount=10)
         file_handler.setFormatter(
             logging.Formatter("%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]")
