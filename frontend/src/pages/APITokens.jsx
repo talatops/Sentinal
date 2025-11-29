@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 // eslint-disable-next-line no-unused-vars
-import { motion } from 'framer-motion';
-import { apiTokenService } from '../services/apiTokenService';
-import { useAuthStore } from '../store/authStore';
+import { motion } from "framer-motion";
+import { apiTokenService } from "../services/apiTokenService";
+import { useAuthStore } from "../store/authStore";
 import {
   KeyIcon,
   PlusIcon,
@@ -10,7 +10,7 @@ import {
   ClipboardDocumentIcon,
   CheckCircleIcon,
   XCircleIcon,
-} from '@heroicons/react/24/outline';
+} from "@heroicons/react/24/outline";
 
 const APITokens = () => {
   const { user } = useAuthStore();
@@ -21,16 +21,16 @@ const APITokens = () => {
   const [newToken, setNewToken] = useState(null);
   const [copiedToken, setCopiedToken] = useState(null);
   const [formData, setFormData] = useState({
-    name: '',
-    expires_in_days: '',
-    scopes: ['webhook:write'],
+    name: "",
+    expires_in_days: "",
+    scopes: ["webhook:write"],
   });
 
   useEffect(() => {
-    if (user?.role === 'Admin') {
+    if (user?.role === "Admin") {
       loadTokens();
     } else {
-      setError('Admin access required');
+      setError("Admin access required");
       setLoading(false);
     }
   }, [user]);
@@ -42,8 +42,8 @@ const APITokens = () => {
       const data = await apiTokenService.listTokens();
       setTokens(data.tokens || []);
     } catch (err) {
-      console.error('Failed to load API tokens:', err);
-      setError(err.response?.data?.error || 'Failed to load API tokens');
+      console.error("Failed to load API tokens:", err);
+      setError(err.response?.data?.error || "Failed to load API tokens");
     } finally {
       setLoading(false);
     }
@@ -55,33 +55,39 @@ const APITokens = () => {
       setError(null);
       const payload = {
         name: formData.name,
-        expires_in_days: formData.expires_in_days ? parseInt(formData.expires_in_days) : null,
+        expires_in_days: formData.expires_in_days
+          ? parseInt(formData.expires_in_days)
+          : null,
         scopes: formData.scopes,
       };
-      
+
       const data = await apiTokenService.createToken(payload);
       setNewToken(data.token);
-      setFormData({ name: '', expires_in_days: '', scopes: ['webhook:write'] });
+      setFormData({ name: "", expires_in_days: "", scopes: ["webhook:write"] });
       setShowCreateForm(false);
       await loadTokens();
     } catch (err) {
-      console.error('Failed to create API token:', err);
-      setError(err.response?.data?.error || 'Failed to create API token');
+      console.error("Failed to create API token:", err);
+      setError(err.response?.data?.error || "Failed to create API token");
     }
   };
 
   const handleRevokeToken = async (tokenId) => {
-    if (!window.confirm('Are you sure you want to revoke this token? This action cannot be undone.')) {
+    if (
+      !window.confirm(
+        "Are you sure you want to revoke this token? This action cannot be undone.",
+      )
+    ) {
       return;
     }
-    
+
     try {
       setError(null);
       await apiTokenService.revokeToken(tokenId);
       await loadTokens();
     } catch (err) {
-      console.error('Failed to revoke API token:', err);
-      setError(err.response?.data?.error || 'Failed to revoke API token');
+      console.error("Failed to revoke API token:", err);
+      setError(err.response?.data?.error || "Failed to revoke API token");
     }
   };
 
@@ -91,13 +97,15 @@ const APITokens = () => {
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
-  if (user?.role !== 'Admin') {
+  if (user?.role !== "Admin") {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <XCircleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-          <p className="text-gray-400">Admin role required to manage API tokens</p>
+          <p className="text-gray-400">
+            Admin role required to manage API tokens
+          </p>
         </div>
       </div>
     );
@@ -120,7 +128,9 @@ const APITokens = () => {
       >
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">API Tokens</h1>
-          <p className="text-gray-400">Manage API tokens for webhook authentication</p>
+          <p className="text-gray-400">
+            Manage API tokens for webhook authentication
+          </p>
         </div>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
@@ -147,7 +157,9 @@ const APITokens = () => {
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-2">
               <CheckCircleIcon className="w-6 h-6 text-green-400" />
-              <h3 className="text-lg font-bold text-white">Token Created Successfully</h3>
+              <h3 className="text-lg font-bold text-white">
+                Token Created Successfully
+              </h3>
             </div>
             <button
               onClick={() => setNewToken(null)}
@@ -157,18 +169,19 @@ const APITokens = () => {
             </button>
           </div>
           <p className="text-gray-300 mb-4">
-            <strong className="text-yellow-400">Important:</strong> Copy this token now. You won't be able to see it again!
+            <strong className="text-yellow-400">Important:</strong> Copy this
+            token now. You won't be able to see it again!
           </p>
           <div className="flex items-center gap-2 mb-4">
             <code className="flex-1 p-3 bg-cyber-dark rounded border border-cyber-blue/30 text-sm text-gray-300 break-all">
               {newToken}
             </code>
             <button
-              onClick={() => copyToClipboard(newToken, 'new')}
+              onClick={() => copyToClipboard(newToken, "new")}
               className="p-3 bg-cyber-blue hover:bg-cyber-blue/80 rounded transition-colors"
               title="Copy token"
             >
-              {copiedToken === 'new' ? (
+              {copiedToken === "new" ? (
                 <CheckCircleIcon className="w-5 h-5 text-green-400" />
               ) : (
                 <ClipboardDocumentIcon className="w-5 h-5 text-white" />
@@ -185,7 +198,9 @@ const APITokens = () => {
           animate={{ opacity: 1, y: 0 }}
           className="card"
         >
-          <h2 className="text-xl font-bold text-white mb-4">Create New API Token</h2>
+          <h2 className="text-xl font-bold text-white mb-4">
+            Create New API Token
+          </h2>
           <form onSubmit={handleCreateToken} className="space-y-4">
             <div>
               <label className="block text-gray-400 text-sm font-medium mb-2">
@@ -196,11 +211,13 @@ const APITokens = () => {
                 className="input-field w-full"
                 placeholder="e.g., GitHub Actions Webhook"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-gray-400 text-sm font-medium mb-2">
                 Expires In (Days)
@@ -210,10 +227,14 @@ const APITokens = () => {
                 className="input-field w-full"
                 placeholder="Leave empty for no expiration"
                 value={formData.expires_in_days}
-                onChange={(e) => setFormData({ ...formData, expires_in_days: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, expires_in_days: e.target.value })
+                }
                 min="1"
               />
-              <p className="text-xs text-gray-500 mt-1">Leave empty for tokens that never expire</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Leave empty for tokens that never expire
+              </p>
             </div>
 
             <div>
@@ -224,23 +245,29 @@ const APITokens = () => {
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={formData.scopes.includes('webhook:write')}
+                    checked={formData.scopes.includes("webhook:write")}
                     onChange={(e) => {
                       if (e.target.checked) {
                         setFormData({
                           ...formData,
-                          scopes: [...formData.scopes, 'webhook:write'].filter((v, i, a) => a.indexOf(v) === i),
+                          scopes: [...formData.scopes, "webhook:write"].filter(
+                            (v, i, a) => a.indexOf(v) === i,
+                          ),
                         });
                       } else {
                         setFormData({
                           ...formData,
-                          scopes: formData.scopes.filter((s) => s !== 'webhook:write'),
+                          scopes: formData.scopes.filter(
+                            (s) => s !== "webhook:write",
+                          ),
                         });
                       }
                     }}
                     className="rounded"
                   />
-                  <span className="text-gray-300">webhook:write - Send webhook data</span>
+                  <span className="text-gray-300">
+                    webhook:write - Send webhook data
+                  </span>
                 </label>
               </div>
             </div>
@@ -253,7 +280,11 @@ const APITokens = () => {
                 type="button"
                 onClick={() => {
                   setShowCreateForm(false);
-                  setFormData({ name: '', expires_in_days: '', scopes: ['webhook:write'] });
+                  setFormData({
+                    name: "",
+                    expires_in_days: "",
+                    scopes: ["webhook:write"],
+                  });
                 }}
                 className="btn-secondary"
               >
@@ -268,7 +299,9 @@ const APITokens = () => {
       <div className="card">
         <h2 className="text-xl font-bold text-white mb-4">Existing Tokens</h2>
         {tokens.length === 0 ? (
-          <p className="text-gray-400 text-center py-8">No API tokens created yet</p>
+          <p className="text-gray-400 text-center py-8">
+            No API tokens created yet
+          </p>
         ) : (
           <div className="space-y-3">
             {tokens.map((token) => (
@@ -291,7 +324,9 @@ const APITokens = () => {
                     )}
                   </div>
                   <div className="text-sm text-gray-400 space-y-1">
-                    <p>Created: {new Date(token.created_at).toLocaleString()}</p>
+                    <p>
+                      Created: {new Date(token.created_at).toLocaleString()}
+                    </p>
                     {token.expires_at && (
                       <p>
                         Expires: {new Date(token.expires_at).toLocaleString()}
@@ -301,10 +336,18 @@ const APITokens = () => {
                       </p>
                     )}
                     {token.last_used_at && (
-                      <p>Last used: {new Date(token.last_used_at).toLocaleString()}</p>
+                      <p>
+                        Last used:{" "}
+                        {new Date(token.last_used_at).toLocaleString()}
+                      </p>
                     )}
                     {token.scopes && token.scopes.length > 0 && (
-                      <p>Scopes: {Array.isArray(token.scopes) ? token.scopes.join(', ') : token.scopes}</p>
+                      <p>
+                        Scopes:{" "}
+                        {Array.isArray(token.scopes)
+                          ? token.scopes.join(", ")
+                          : token.scopes}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -327,4 +370,3 @@ const APITokens = () => {
 };
 
 export default APITokens;
-

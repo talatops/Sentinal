@@ -1,20 +1,25 @@
 // eslint-disable-next-line no-unused-vars
-import { motion } from 'framer-motion';
-import { CheckCircleIcon, XCircleIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { motion } from "framer-motion";
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
 
 const ScanDetails = ({ scan, onRetry, onCancel, onExport }) => {
   if (!scan) return null;
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'completed':
-      case 'Success':
+      case "completed":
+      case "Success":
         return <CheckCircleIcon className="w-6 h-6 text-green-400" />;
-      case 'failed':
-      case 'Failed':
+      case "failed":
+      case "Failed":
         return <XCircleIcon className="w-6 h-6 text-red-400" />;
-      case 'running':
-      case 'Running':
+      case "running":
+      case "Running":
         return <ClockIcon className="w-6 h-6 text-yellow-400 animate-spin" />;
       default:
         return <ExclamationTriangleIcon className="w-6 h-6 text-gray-400" />;
@@ -23,17 +28,17 @@ const ScanDetails = ({ scan, onRetry, onCancel, onExport }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'completed':
-      case 'Success':
-        return 'bg-green-500/20 text-green-400';
-      case 'failed':
-      case 'Failed':
-        return 'bg-red-500/20 text-red-400';
-      case 'running':
-      case 'Running':
-        return 'bg-yellow-500/20 text-yellow-400';
+      case "completed":
+      case "Success":
+        return "bg-green-500/20 text-green-400";
+      case "failed":
+      case "Failed":
+        return "bg-red-500/20 text-red-400";
+      case "running":
+      case "Running":
+        return "bg-yellow-500/20 text-yellow-400";
       default:
-        return 'bg-gray-500/20 text-gray-400';
+        return "bg-gray-500/20 text-gray-400";
     }
   };
 
@@ -50,17 +55,21 @@ const ScanDetails = ({ scan, onRetry, onCancel, onExport }) => {
             <h3 className="text-lg font-bold text-white">Scan Details</h3>
             <p className="text-sm text-gray-400">
               {scan.scan_timestamp || scan.created_at
-                ? new Date(scan.scan_timestamp || scan.created_at).toLocaleString()
-                : 'No timestamp'}
+                ? new Date(
+                    scan.scan_timestamp || scan.created_at,
+                  ).toLocaleString()
+                : "No timestamp"}
             </p>
           </div>
         </div>
-        <span className={`px-3 py-1 rounded text-sm font-medium ${getStatusColor(scan.status)}`}>
+        <span
+          className={`px-3 py-1 rounded text-sm font-medium ${getStatusColor(scan.status)}`}
+        >
           {scan.status}
         </span>
       </div>
 
-      {scan.status === 'running' && scan.active_scan_progress !== undefined && (
+      {scan.status === "running" && scan.active_scan_progress !== undefined && (
         <div className="mb-4">
           <div className="flex justify-between text-sm text-gray-400 mb-2">
             <span>Progress</span>
@@ -91,7 +100,9 @@ const ScanDetails = ({ scan, onRetry, onCancel, onExport }) => {
         {scan.commit_hash && (
           <div>
             <p className="text-sm text-gray-400">Commit</p>
-            <p className="text-white font-medium font-mono text-sm">{scan.commit_hash.substring(0, 8)}</p>
+            <p className="text-white font-medium font-mono text-sm">
+              {scan.commit_hash.substring(0, 8)}
+            </p>
           </div>
         )}
         {scan.branch && (
@@ -114,12 +125,12 @@ const ScanDetails = ({ scan, onRetry, onCancel, onExport }) => {
             Retry
           </button>
         )}
-        {onCancel && scan.status === 'running' && (
+        {onCancel && scan.status === "running" && (
           <button onClick={onCancel} className="btn-secondary text-sm">
             Cancel
           </button>
         )}
-        {onExport && scan.status === 'completed' && (
+        {onExport && scan.status === "completed" && (
           <button onClick={onExport} className="btn-primary text-sm">
             Export
           </button>
@@ -130,4 +141,3 @@ const ScanDetails = ({ scan, onRetry, onCancel, onExport }) => {
 };
 
 export default ScanDetails;
-

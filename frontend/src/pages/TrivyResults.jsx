@@ -1,15 +1,27 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 // eslint-disable-next-line no-unused-vars
-import { motion } from 'framer-motion';
-import { useParams, useNavigate } from 'react-router-dom';
-import { cicdService } from '../services/cicdService';
+import { motion } from "framer-motion";
+import { useParams, useNavigate } from "react-router-dom";
+import { cicdService } from "../services/cicdService";
 import {
   ShieldExclamationIcon,
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
-} from '@heroicons/react/24/outline';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+} from "@heroicons/react/24/outline";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 
 const TrivyResults = () => {
   const { runId } = useParams();
@@ -18,20 +30,16 @@ const TrivyResults = () => {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     severity: [],
-    package: '',
-    cve: '',
-    package_type: '',
-    cvss_min: '',
-    search: '',
+    package: "",
+    cve: "",
+    package_type: "",
+    cvss_min: "",
+    search: "",
     page: 1,
     per_page: 50,
   });
   const [showFilters, setShowFilters] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
-
-  useEffect(() => {
-    loadData();
-  }, [runId, filters.page, filters.per_page, loadData]);
 
   const loadData = useCallback(async () => {
     try {
@@ -39,18 +47,22 @@ const TrivyResults = () => {
       const result = runId
         ? await cicdService.getRunTrivy(parseInt(runId), filters)
         : await cicdService.getLatestTrivy();
-      
+
       if (runId && result.results) {
         setData(result.results);
       } else if (!runId && result.trivy_results) {
         setData(result.trivy_results);
       }
     } catch (error) {
-      console.error('Failed to load Trivy results:', error);
+      console.error("Failed to load Trivy results:", error);
     } finally {
       setLoading(false);
     }
-  }, [runId, filters.page, filters.per_page]);
+  }, [runId, filters]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const toggleRow = (vulnId) => {
     const newExpanded = new Set(expandedRows);
@@ -66,16 +78,15 @@ const TrivyResults = () => {
     setFilters({ ...filters, ...newFilters, page: 1 });
   };
 
-
   const getSeverityBg = (severity) => {
     const colors = {
-      CRITICAL: 'bg-red-500/20 text-red-400',
-      HIGH: 'bg-orange-500/20 text-orange-400',
-      MEDIUM: 'bg-yellow-500/20 text-yellow-400',
-      LOW: 'bg-blue-500/20 text-blue-400',
-      UNKNOWN: 'bg-gray-500/20 text-gray-400',
+      CRITICAL: "bg-red-500/20 text-red-400",
+      HIGH: "bg-orange-500/20 text-orange-400",
+      MEDIUM: "bg-yellow-500/20 text-yellow-400",
+      LOW: "bg-blue-500/20 text-blue-400",
+      UNKNOWN: "bg-gray-500/20 text-gray-400",
     };
-    return colors[severity] || 'bg-gray-500/20 text-gray-400';
+    return colors[severity] || "bg-gray-500/20 text-gray-400";
   };
 
   if (loading) {
@@ -95,24 +106,54 @@ const TrivyResults = () => {
   }
 
   const vulnerabilities = data.vulnerabilities || [];
-  const pagination = data.pagination || { page: 1, per_page: 50, total: vulnerabilities.length, pages: 1 };
+  const pagination = data.pagination || {
+    page: 1,
+    per_page: 50,
+    total: vulnerabilities.length,
+    pages: 1,
+  };
 
   const stats = [
-    { name: 'Total Vulnerabilities', value: data.total || 0, icon: ShieldExclamationIcon, color: 'text-cyber-blue' },
-    { name: 'Critical', value: data.critical || 0, icon: ExclamationTriangleIcon, color: 'text-red-500' },
-    { name: 'High', value: data.high || 0, icon: ExclamationTriangleIcon, color: 'text-orange-500' },
-    { name: 'Medium', value: data.medium || 0, icon: ExclamationTriangleIcon, color: 'text-yellow-500' },
-    { name: 'Low', value: data.low || 0, icon: ExclamationTriangleIcon, color: 'text-blue-500' },
+    {
+      name: "Total Vulnerabilities",
+      value: data.total || 0,
+      icon: ShieldExclamationIcon,
+      color: "text-cyber-blue",
+    },
+    {
+      name: "Critical",
+      value: data.critical || 0,
+      icon: ExclamationTriangleIcon,
+      color: "text-red-500",
+    },
+    {
+      name: "High",
+      value: data.high || 0,
+      icon: ExclamationTriangleIcon,
+      color: "text-orange-500",
+    },
+    {
+      name: "Medium",
+      value: data.medium || 0,
+      icon: ExclamationTriangleIcon,
+      color: "text-yellow-500",
+    },
+    {
+      name: "Low",
+      value: data.low || 0,
+      icon: ExclamationTriangleIcon,
+      color: "text-blue-500",
+    },
   ];
 
   const severityData = [
-    { name: 'Critical', value: data.critical || 0 },
-    { name: 'High', value: data.high || 0 },
-    { name: 'Medium', value: data.medium || 0 },
-    { name: 'Low', value: data.low || 0 },
-  ].filter(item => item.value > 0);
+    { name: "Critical", value: data.critical || 0 },
+    { name: "High", value: data.high || 0 },
+    { name: "Medium", value: data.medium || 0 },
+    { name: "Low", value: data.low || 0 },
+  ].filter((item) => item.value > 0);
 
-  const COLORS = ['#EF4444', '#F97316', '#EAB308', '#3B82F6'];
+  const COLORS = ["#EF4444", "#F97316", "#EAB308", "#3B82F6"];
 
   return (
     <div className="space-y-6">
@@ -122,10 +163,14 @@ const TrivyResults = () => {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Trivy Scan Results</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Trivy Scan Results
+          </h1>
           <p className="text-gray-400">
-            Image: {data.image || 'N/A'} | 
-            {data.scan_timestamp ? ` Scanned: ${new Date(data.scan_timestamp).toLocaleString()}` : ''}
+            Image: {data.image || "N/A"} |
+            {data.scan_timestamp
+              ? ` Scanned: ${new Date(data.scan_timestamp).toLocaleString()}`
+              : ""}
           </p>
         </div>
         <div className="flex gap-2">
@@ -136,10 +181,7 @@ const TrivyResults = () => {
             <FunnelIcon className="w-5 h-5" />
             Filters
           </button>
-          <button
-            onClick={() => navigate('/')}
-            className="btn-primary"
-          >
+          <button onClick={() => navigate("/")} className="btn-primary">
             Back to Dashboard
           </button>
         </div>
@@ -158,7 +200,9 @@ const TrivyResults = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm">{stat.name}</p>
-                <p className="text-3xl font-bold text-white mt-2">{stat.value}</p>
+                <p className="text-3xl font-bold text-white mt-2">
+                  {stat.value}
+                </p>
               </div>
               <stat.icon className={`w-12 h-12 ${stat.color}`} />
             </div>
@@ -177,20 +221,28 @@ const TrivyResults = () => {
           <h2 className="text-xl font-bold text-white mb-4">Package Summary</h2>
           {data.os_packages && (
             <div className="mb-4">
-              <p className="text-gray-400">OS Packages: {data.os_packages.total || 0}</p>
-              <p className="text-red-400">Vulnerable: {data.os_packages.vulnerable || 0}</p>
+              <p className="text-gray-400">
+                OS Packages: {data.os_packages.total || 0}
+              </p>
+              <p className="text-red-400">
+                Vulnerable: {data.os_packages.vulnerable || 0}
+              </p>
             </div>
           )}
-          {data.language_packages && Object.keys(data.language_packages).length > 0 && (
-            <div>
-              <p className="text-gray-400 mb-2">Language Packages:</p>
-              {Object.entries(data.language_packages).map(([lang, info]) => (
-                <div key={lang} className="mb-2">
-                  <p className="text-sm text-gray-300 capitalize">{lang}: {info.total || 0} total, {info.vulnerable || 0} vulnerable</p>
-                </div>
-              ))}
-            </div>
-          )}
+          {data.language_packages &&
+            Object.keys(data.language_packages).length > 0 && (
+              <div>
+                <p className="text-gray-400 mb-2">Language Packages:</p>
+                {Object.entries(data.language_packages).map(([lang, info]) => (
+                  <div key={lang} className="mb-2">
+                    <p className="text-sm text-gray-300 capitalize">
+                      {lang}: {info.total || 0} total, {info.vulnerable || 0}{" "}
+                      vulnerable
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
         </motion.div>
 
         <motion.div
@@ -199,7 +251,9 @@ const TrivyResults = () => {
           transition={{ delay: 0.6 }}
           className="card"
         >
-          <h2 className="text-xl font-bold text-white mb-4">Vulnerability Distribution</h2>
+          <h2 className="text-xl font-bold text-white mb-4">
+            Vulnerability Distribution
+          </h2>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
@@ -213,7 +267,10 @@ const TrivyResults = () => {
                 dataKey="value"
               >
                 {severityData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}
+                  />
                 ))}
               </Pie>
               <Tooltip />
@@ -226,7 +283,7 @@ const TrivyResults = () => {
       {showFilters && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
+          animate={{ opacity: 1, height: "auto" }}
           className="card"
         >
           <h3 className="text-lg font-bold text-white mb-4">Filters</h3>
@@ -238,7 +295,10 @@ const TrivyResults = () => {
                 className="input-field w-full"
                 value={filters.severity}
                 onChange={(e) => {
-                  const values = Array.from(e.target.selectedOptions, option => option.value);
+                  const values = Array.from(
+                    e.target.selectedOptions,
+                    (option) => option.value,
+                  );
                   applyFilters({ severity: values });
                 }}
               >
@@ -274,7 +334,9 @@ const TrivyResults = () => {
         className="card"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-white">Vulnerabilities ({pagination.total})</h2>
+          <h2 className="text-xl font-bold text-white">
+            Vulnerabilities ({pagination.total})
+          </h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -297,16 +359,24 @@ const TrivyResults = () => {
                     onClick={() => toggleRow(vuln.vulnerability_id)}
                   >
                     <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getSeverityBg(vuln.severity)}`}>
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${getSeverityBg(vuln.severity)}`}
+                      >
                         {vuln.severity}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-gray-300 text-sm">{vuln.vulnerability_id}</td>
+                    <td className="py-3 px-4 text-gray-300 text-sm">
+                      {vuln.vulnerability_id}
+                    </td>
                     <td className="py-3 px-4 text-gray-300">{vuln.pkg_name}</td>
-                    <td className="py-3 px-4 text-gray-300 text-sm">{vuln.installed_version || '-'}</td>
-                    <td className="py-3 px-4 text-gray-300 text-sm">{vuln.fixed_version || '-'}</td>
+                    <td className="py-3 px-4 text-gray-300 text-sm">
+                      {vuln.installed_version || "-"}
+                    </td>
+                    <td className="py-3 px-4 text-gray-300 text-sm">
+                      {vuln.fixed_version || "-"}
+                    </td>
                     <td className="py-3 px-4 text-gray-300">
-                      {vuln.cvss?.v3?.score || vuln.cvss?.v2?.score || '-'}
+                      {vuln.cvss?.v3?.score || vuln.cvss?.v2?.score || "-"}
                     </td>
                   </tr>
                   {expandedRows.has(vuln.vulnerability_id) && (
@@ -314,40 +384,67 @@ const TrivyResults = () => {
                       <td colSpan={6} className="py-4 px-4 bg-cyber-dark">
                         <div className="space-y-2">
                           <div>
-                            <strong className="text-cyber-blue">Title:</strong> {vuln.title || vuln.vulnerability_id}
+                            <strong className="text-cyber-blue">Title:</strong>{" "}
+                            {vuln.title || vuln.vulnerability_id}
                           </div>
                           {vuln.description && (
                             <div>
-                              <strong className="text-cyber-blue">Description:</strong>
-                              <p className="text-gray-300 mt-1">{vuln.description}</p>
+                              <strong className="text-cyber-blue">
+                                Description:
+                              </strong>
+                              <p className="text-gray-300 mt-1">
+                                {vuln.description}
+                              </p>
                             </div>
                           )}
                           {vuln.cvss && (
                             <div>
-                              <strong className="text-cyber-blue">CVSS Scores:</strong>
+                              <strong className="text-cyber-blue">
+                                CVSS Scores:
+                              </strong>
                               {vuln.cvss.v3 && (
-                                <p className="text-gray-300 mt-1">v3: {vuln.cvss.v3.score} ({vuln.cvss.v3.vector})</p>
+                                <p className="text-gray-300 mt-1">
+                                  v3: {vuln.cvss.v3.score} (
+                                  {vuln.cvss.v3.vector})
+                                </p>
                               )}
                               {vuln.cvss.v2 && (
-                                <p className="text-gray-300">v2: {vuln.cvss.v2.score} ({vuln.cvss.v2.vector})</p>
+                                <p className="text-gray-300">
+                                  v2: {vuln.cvss.v2.score} (
+                                  {vuln.cvss.v2.vector})
+                                </p>
                               )}
                             </div>
                           )}
                           {vuln.cwe_ids && vuln.cwe_ids.length > 0 && (
                             <div>
-                              <strong className="text-cyber-blue">CWE IDs:</strong>{' '}
-                              {vuln.cwe_ids.map(cwe => (
-                                <span key={cwe} className="px-2 py-1 bg-gray-700 rounded text-xs mr-1">{cwe}</span>
+                              <strong className="text-cyber-blue">
+                                CWE IDs:
+                              </strong>{" "}
+                              {vuln.cwe_ids.map((cwe) => (
+                                <span
+                                  key={cwe}
+                                  className="px-2 py-1 bg-gray-700 rounded text-xs mr-1"
+                                >
+                                  {cwe}
+                                </span>
                               ))}
                             </div>
                           )}
                           {vuln.references && vuln.references.length > 0 && (
                             <div>
-                              <strong className="text-cyber-blue">References:</strong>
+                              <strong className="text-cyber-blue">
+                                References:
+                              </strong>
                               <ul className="list-disc list-inside mt-1">
                                 {vuln.references.map((ref, idx) => (
                                   <li key={idx}>
-                                    <a href={ref} target="_blank" rel="noopener noreferrer" className="text-cyber-blue hover:underline">
+                                    <a
+                                      href={ref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-cyber-blue hover:underline"
+                                    >
                                       {ref}
                                     </a>
                                   </li>
@@ -357,8 +454,15 @@ const TrivyResults = () => {
                           )}
                           {vuln.primary_url && (
                             <div>
-                              <strong className="text-cyber-blue">Primary URL:</strong>{' '}
-                              <a href={vuln.primary_url} target="_blank" rel="noopener noreferrer" className="text-cyber-blue hover:underline">
+                              <strong className="text-cyber-blue">
+                                Primary URL:
+                              </strong>{" "}
+                              <a
+                                href={vuln.primary_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-cyber-blue hover:underline"
+                              >
                                 {vuln.primary_url}
                               </a>
                             </div>
@@ -399,4 +503,3 @@ const TrivyResults = () => {
 };
 
 export default TrivyResults;
-

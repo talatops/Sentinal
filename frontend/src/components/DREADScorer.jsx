@@ -1,18 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 // eslint-disable-next-line no-unused-vars
-import { motion } from 'framer-motion';
+import { motion } from "framer-motion";
 import {
   InformationCircleIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
-} from '@heroicons/react/24/outline';
+} from "@heroicons/react/24/outline";
 
-const DREADScorer = ({ 
-  suggestedScores = {}, 
-  confidence = {}, 
+const DREADScorer = ({
+  suggestedScores = {},
+  confidence = {},
   explanations = {},
   onScoresChange,
-  autoScore = false 
+  autoScore = false,
 }) => {
   const [scores, setScores] = useState({
     damage: suggestedScores.damage || 5,
@@ -35,28 +35,30 @@ const DREADScorer = ({
   }, [scores, onScoresChange]);
 
   const handleSliderChange = (key, value) => {
-    setScores(prev => ({
+    setScores((prev) => ({
       ...prev,
-      [key]: parseInt(value)
+      [key]: parseInt(value),
     }));
   };
 
   const getConfidenceColor = (conf) => {
-    if (conf >= 0.8) return 'text-green-400 bg-green-500/20 border-green-500/30';
-    if (conf >= 0.6) return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30';
-    return 'text-orange-400 bg-orange-500/20 border-orange-500/30';
+    if (conf >= 0.8)
+      return "text-green-400 bg-green-500/20 border-green-500/30";
+    if (conf >= 0.6)
+      return "text-yellow-400 bg-yellow-500/20 border-yellow-500/30";
+    return "text-orange-400 bg-orange-500/20 border-orange-500/30";
   };
 
   const getConfidenceBadge = (conf) => {
-    if (conf >= 0.8) return 'High';
-    if (conf >= 0.6) return 'Medium';
-    return 'Low';
+    if (conf >= 0.8) return "High";
+    if (conf >= 0.6) return "Medium";
+    return "Low";
   };
 
   const getScoreColor = (score) => {
-    if (score >= 8) return 'text-red-400';
-    if (score >= 5) return 'text-yellow-400';
-    return 'text-green-400';
+    if (score >= 8) return "text-red-400";
+    if (score >= 5) return "text-yellow-400";
+    return "text-green-400";
   };
 
   const acceptAllSuggestions = () => {
@@ -66,15 +68,16 @@ const DREADScorer = ({
   };
 
   const dreadLabels = {
-    damage: 'Damage',
-    reproducibility: 'Reproducibility',
-    exploitability: 'Exploitability',
-    affected_users: 'Affected Users',
-    discoverability: 'Discoverability',
+    damage: "Damage",
+    reproducibility: "Reproducibility",
+    exploitability: "Exploitability",
+    affected_users: "Affected Users",
+    discoverability: "Discoverability",
   };
 
-  const totalScore = Object.values(scores).reduce((sum, val) => sum + val, 0) / 5;
-  const riskLevel = totalScore > 7 ? 'High' : totalScore > 4 ? 'Medium' : 'Low';
+  const totalScore =
+    Object.values(scores).reduce((sum, val) => sum + val, 0) / 5;
+  const riskLevel = totalScore > 7 ? "High" : totalScore > 4 ? "Medium" : "Low";
 
   return (
     <div className="space-y-6">
@@ -99,7 +102,7 @@ const DREADScorer = ({
         {Object.entries(dreadLabels).map(([key, label]) => {
           const score = scores[key];
           const conf = confidence[key] || 0.5;
-          const explanation = explanations[key] || '';
+          const explanation = explanations[key] || "";
 
           return (
             <motion.div
@@ -114,7 +117,9 @@ const DREADScorer = ({
                     {label}
                   </label>
                   {autoScore && (
-                    <span className={`px-2 py-0.5 text-xs rounded border ${getConfidenceColor(conf)}`}>
+                    <span
+                      className={`px-2 py-0.5 text-xs rounded border ${getConfidenceColor(conf)}`}
+                    >
                       {getConfidenceBadge(conf)} Confidence
                     </span>
                   )}
@@ -132,7 +137,7 @@ const DREADScorer = ({
                 onChange={(e) => handleSliderChange(key, e.target.value)}
                 className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyber-blue"
                 style={{
-                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(score / 10) * 100}%, #374151 ${(score / 10) * 100}%, #374151 100%)`
+                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(score / 10) * 100}%, #374151 ${(score / 10) * 100}%, #374151 100%)`,
                 }}
               />
 
@@ -157,17 +162,19 @@ const DREADScorer = ({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-400 mb-1">Total DREAD Score</p>
-            <p className="text-2xl font-bold text-white">{totalScore.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-white">
+              {totalScore.toFixed(2)}
+            </p>
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-400 mb-1">Risk Level</p>
             <span
               className={`px-4 py-2 rounded-lg font-bold ${
-                riskLevel === 'High'
-                  ? 'text-red-400 bg-red-500/20 border border-red-500/30'
-                  : riskLevel === 'Medium'
-                  ? 'text-yellow-400 bg-yellow-500/20 border border-yellow-500/30'
-                  : 'text-green-400 bg-green-500/20 border border-green-500/30'
+                riskLevel === "High"
+                  ? "text-red-400 bg-red-500/20 border border-red-500/30"
+                  : riskLevel === "Medium"
+                    ? "text-yellow-400 bg-yellow-500/20 border border-yellow-500/30"
+                    : "text-green-400 bg-green-500/20 border border-green-500/30"
               }`}
             >
               {riskLevel}
@@ -178,13 +185,17 @@ const DREADScorer = ({
 
       {explanations.pattern_context && (
         <div className="p-3 bg-cyber-blue/10 border border-cyber-blue/30 rounded-lg">
-          <p className="text-sm text-cyber-blue">{explanations.pattern_context}</p>
+          <p className="text-sm text-cyber-blue">
+            {explanations.pattern_context}
+          </p>
         </div>
       )}
 
       {explanations.component_context && (
         <div className="p-3 bg-cyber-blue/10 border border-cyber-blue/30 rounded-lg">
-          <p className="text-sm text-cyber-blue">{explanations.component_context}</p>
+          <p className="text-sm text-cyber-blue">
+            {explanations.component_context}
+          </p>
         </div>
       )}
     </div>
@@ -192,4 +203,3 @@ const DREADScorer = ({
 };
 
 export default DREADScorer;
-

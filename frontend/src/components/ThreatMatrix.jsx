@@ -1,29 +1,37 @@
-import { useMemo } from 'react';
+import { useMemo } from "react";
 // eslint-disable-next-line no-unused-vars
-import { motion } from 'framer-motion';
+import { motion } from "framer-motion";
 
 const ThreatMatrix = ({ threats }) => {
   const matrixData = useMemo(() => {
-    if (!threats || threats.length === 0) return { assets: [], strideCategories: [], data: {} };
+    if (!threats || threats.length === 0)
+      return { assets: [], strideCategories: [], data: {} };
 
     // Extract unique assets and STRIDE categories
-    const assets = [...new Set(threats.map(t => t.asset))];
-    const strideCategories = ['Spoofing', 'Tampering', 'Repudiation', 'Information Disclosure', 'Denial of Service', 'Elevation of Privilege'];
+    const assets = [...new Set(threats.map((t) => t.asset))];
+    const strideCategories = [
+      "Spoofing",
+      "Tampering",
+      "Repudiation",
+      "Information Disclosure",
+      "Denial of Service",
+      "Elevation of Privilege",
+    ];
 
     // Build matrix data
     const data = {};
-    assets.forEach(asset => {
+    assets.forEach((asset) => {
       data[asset] = {};
-      strideCategories.forEach(category => {
+      strideCategories.forEach((category) => {
         data[asset][category] = 0;
       });
     });
 
     // Count threats per asset-stride combination
-    threats.forEach(threat => {
+    threats.forEach((threat) => {
       const asset = threat.asset;
       const categories = threat.stride_categories || [];
-      categories.forEach(category => {
+      categories.forEach((category) => {
         if (data[asset] && data[asset][category] !== undefined) {
           data[asset][category]++;
         }
@@ -34,18 +42,18 @@ const ThreatMatrix = ({ threats }) => {
   }, [threats]);
 
   const getHeatColor = (count, maxCount) => {
-    if (count === 0) return 'bg-gray-800';
+    if (count === 0) return "bg-gray-800";
     const intensity = maxCount > 0 ? count / maxCount : 0;
-    if (intensity > 0.7) return 'bg-red-600';
-    if (intensity > 0.4) return 'bg-orange-500';
-    if (intensity > 0.2) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (intensity > 0.7) return "bg-red-600";
+    if (intensity > 0.4) return "bg-orange-500";
+    if (intensity > 0.2) return "bg-yellow-500";
+    return "bg-green-500";
   };
 
   const maxCount = useMemo(() => {
     let max = 0;
-    Object.values(matrixData.data).forEach(assetData => {
-      Object.values(assetData).forEach(count => {
+    Object.values(matrixData.data).forEach((assetData) => {
+      Object.values(assetData).forEach((count) => {
         if (count > max) max = count;
       });
     });
@@ -66,7 +74,9 @@ const ThreatMatrix = ({ threats }) => {
       animate={{ opacity: 1 }}
       className="card overflow-x-auto"
     >
-      <h3 className="text-lg font-bold text-white mb-4">STRIDE vs Asset Heatmap</h3>
+      <h3 className="text-lg font-bold text-white mb-4">
+        STRIDE vs Asset Heatmap
+      </h3>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
@@ -74,7 +84,7 @@ const ThreatMatrix = ({ threats }) => {
               <th className="sticky left-0 bg-cyber-dark border border-gray-700 px-4 py-2 text-left text-sm font-medium text-gray-300 z-10">
                 Asset
               </th>
-              {matrixData.strideCategories.map(category => (
+              {matrixData.strideCategories.map((category) => (
                 <th
                   key={category}
                   className="border border-gray-700 px-4 py-2 text-center text-xs font-medium text-gray-300 min-w-[120px]"
@@ -96,7 +106,7 @@ const ThreatMatrix = ({ threats }) => {
                 <td className="sticky left-0 bg-cyber-dark border border-gray-700 px-4 py-2 text-sm text-white font-medium z-10">
                   {asset}
                 </td>
-                {matrixData.strideCategories.map(category => {
+                {matrixData.strideCategories.map((category) => {
                   const count = matrixData.data[asset]?.[category] || 0;
                   return (
                     <td
@@ -104,7 +114,7 @@ const ThreatMatrix = ({ threats }) => {
                       className={`border border-gray-700 px-4 py-2 text-center ${getHeatColor(count, maxCount)} text-white font-bold`}
                       title={`${count} threat(s) for ${asset} - ${category}`}
                     >
-                      {count > 0 ? count : '-'}
+                      {count > 0 ? count : "-"}
                     </td>
                   );
                 })}
@@ -140,4 +150,3 @@ const ThreatMatrix = ({ threats }) => {
 };
 
 export default ThreatMatrix;
-

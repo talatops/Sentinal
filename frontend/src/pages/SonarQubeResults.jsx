@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 // eslint-disable-next-line no-unused-vars
-import { motion } from 'framer-motion';
-import { useParams, useNavigate } from 'react-router-dom';
-import { cicdService } from '../services/cicdService';
+import { motion } from "framer-motion";
+import { useParams, useNavigate } from "react-router-dom";
+import { cicdService } from "../services/cicdService";
 import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
@@ -10,8 +10,22 @@ import {
   InformationCircleIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
-} from '@heroicons/react/24/outline';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+} from "@heroicons/react/24/outline";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+} from "recharts";
 
 const SonarQubeResults = () => {
   const { runId } = useParams();
@@ -22,18 +36,14 @@ const SonarQubeResults = () => {
     severity: [],
     type: [],
     status: [],
-    component: '',
-    rule: '',
-    search: '',
+    component: "",
+    rule: "",
+    search: "",
     page: 1,
     per_page: 50,
   });
   const [showFilters, setShowFilters] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
-
-  useEffect(() => {
-    loadData();
-  }, [runId, filters.page, filters.per_page, loadData]);
 
   const loadData = useCallback(async () => {
     try {
@@ -41,18 +51,22 @@ const SonarQubeResults = () => {
       const result = runId
         ? await cicdService.getRunSAST(parseInt(runId), filters)
         : await cicdService.getLatestSonarQube();
-      
+
       if (runId && result.results) {
         setData(result.results);
       } else if (!runId && result.sast_results) {
         setData(result.sast_results);
       }
     } catch (error) {
-      console.error('Failed to load SonarQube results:', error);
+      console.error("Failed to load SonarQube results:", error);
     } finally {
       setLoading(false);
     }
-  }, [runId, filters.page, filters.per_page]);
+  }, [runId, filters]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const toggleRow = (issueKey) => {
     const newExpanded = new Set(expandedRows);
@@ -68,16 +82,15 @@ const SonarQubeResults = () => {
     setFilters({ ...filters, ...newFilters, page: 1 });
   };
 
-
   const getSeverityBg = (severity) => {
     const colors = {
-      CRITICAL: 'bg-red-500/20 text-red-400',
-      BLOCKER: 'bg-red-600/20 text-red-500',
-      MAJOR: 'bg-orange-500/20 text-orange-400',
-      MINOR: 'bg-yellow-500/20 text-yellow-400',
-      INFO: 'bg-blue-500/20 text-blue-400',
+      CRITICAL: "bg-red-500/20 text-red-400",
+      BLOCKER: "bg-red-600/20 text-red-500",
+      MAJOR: "bg-orange-500/20 text-orange-400",
+      MINOR: "bg-yellow-500/20 text-yellow-400",
+      INFO: "bg-blue-500/20 text-blue-400",
     };
-    return colors[severity] || 'bg-gray-500/20 text-gray-400';
+    return colors[severity] || "bg-gray-500/20 text-gray-400";
   };
 
   if (loading) {
@@ -99,24 +112,54 @@ const SonarQubeResults = () => {
   const issues = data.issues || [];
   const metrics = data.metrics || {};
   const qualityGate = data.quality_gate || {};
-  const pagination = data.pagination || { page: 1, per_page: 50, total: issues.length, pages: 1 };
+  const pagination = data.pagination || {
+    page: 1,
+    per_page: 50,
+    total: issues.length,
+    pages: 1,
+  };
 
   const stats = [
-    { name: 'Total Issues', value: data.total || 0, icon: ExclamationTriangleIcon, color: 'text-cyber-blue' },
-    { name: 'Critical', value: data.critical || 0, icon: XCircleIcon, color: 'text-red-500' },
-    { name: 'High', value: data.high || 0, icon: ExclamationTriangleIcon, color: 'text-orange-500' },
-    { name: 'Medium', value: data.medium || 0, icon: InformationCircleIcon, color: 'text-yellow-500' },
-    { name: 'Low', value: data.low || 0, icon: InformationCircleIcon, color: 'text-blue-500' },
+    {
+      name: "Total Issues",
+      value: data.total || 0,
+      icon: ExclamationTriangleIcon,
+      color: "text-cyber-blue",
+    },
+    {
+      name: "Critical",
+      value: data.critical || 0,
+      icon: XCircleIcon,
+      color: "text-red-500",
+    },
+    {
+      name: "High",
+      value: data.high || 0,
+      icon: ExclamationTriangleIcon,
+      color: "text-orange-500",
+    },
+    {
+      name: "Medium",
+      value: data.medium || 0,
+      icon: InformationCircleIcon,
+      color: "text-yellow-500",
+    },
+    {
+      name: "Low",
+      value: data.low || 0,
+      icon: InformationCircleIcon,
+      color: "text-blue-500",
+    },
   ];
 
   const severityData = [
-    { name: 'Critical', value: data.critical || 0 },
-    { name: 'High', value: data.high || 0 },
-    { name: 'Medium', value: data.medium || 0 },
-    { name: 'Low', value: data.low || 0 },
-  ].filter(item => item.value > 0);
+    { name: "Critical", value: data.critical || 0 },
+    { name: "High", value: data.high || 0 },
+    { name: "Medium", value: data.medium || 0 },
+    { name: "Low", value: data.low || 0 },
+  ].filter((item) => item.value > 0);
 
-  const COLORS = ['#EF4444', '#F97316', '#EAB308', '#3B82F6'];
+  const COLORS = ["#EF4444", "#F97316", "#EAB308", "#3B82F6"];
 
   return (
     <div className="space-y-6">
@@ -126,9 +169,13 @@ const SonarQubeResults = () => {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">SonarQube Results</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            SonarQube Results
+          </h1>
           <p className="text-gray-400">
-            {data.scan_timestamp ? `Last scanned: ${new Date(data.scan_timestamp).toLocaleString()}` : 'Scan results'}
+            {data.scan_timestamp
+              ? `Last scanned: ${new Date(data.scan_timestamp).toLocaleString()}`
+              : "Scan results"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -139,10 +186,7 @@ const SonarQubeResults = () => {
             <FunnelIcon className="w-5 h-5" />
             Filters
           </button>
-          <button
-            onClick={() => navigate('/')}
-            className="btn-primary"
-          >
+          <button onClick={() => navigate("/")} className="btn-primary">
             Back to Dashboard
           </button>
         </div>
@@ -161,7 +205,9 @@ const SonarQubeResults = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm">{stat.name}</p>
-                <p className="text-3xl font-bold text-white mt-2">{stat.value}</p>
+                <p className="text-3xl font-bold text-white mt-2">
+                  {stat.value}
+                </p>
               </div>
               <stat.icon className={`w-12 h-12 ${stat.color}`} />
             </div>
@@ -178,10 +224,14 @@ const SonarQubeResults = () => {
           className="card"
         >
           <h2 className="text-xl font-bold text-white mb-4">Quality Gate</h2>
-          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${
-            qualityGate.status === 'PASSED' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-          }`}>
-            {qualityGate.status === 'PASSED' ? (
+          <div
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${
+              qualityGate.status === "PASSED"
+                ? "bg-green-500/20 text-green-400"
+                : "bg-red-500/20 text-red-400"
+            }`}
+          >
+            {qualityGate.status === "PASSED" ? (
               <CheckCircleIcon className="w-6 h-6" />
             ) : (
               <XCircleIcon className="w-6 h-6" />
@@ -211,7 +261,9 @@ const SonarQubeResults = () => {
             </span>
           </div>
           {metrics.technical_debt && (
-            <p className="text-sm text-gray-400 mt-2">Technical Debt: {metrics.technical_debt}</p>
+            <p className="text-sm text-gray-400 mt-2">
+              Technical Debt: {metrics.technical_debt}
+            </p>
           )}
         </motion.div>
       </div>
@@ -220,7 +272,7 @@ const SonarQubeResults = () => {
       {showFilters && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
+          animate={{ opacity: 1, height: "auto" }}
           className="card"
         >
           <h3 className="text-lg font-bold text-white mb-4">Filters</h3>
@@ -232,7 +284,10 @@ const SonarQubeResults = () => {
                 className="input-field w-full"
                 value={filters.severity}
                 onChange={(e) => {
-                  const values = Array.from(e.target.selectedOptions, option => option.value);
+                  const values = Array.from(
+                    e.target.selectedOptions,
+                    (option) => option.value,
+                  );
                   applyFilters({ severity: values });
                 }}
               >
@@ -250,7 +305,10 @@ const SonarQubeResults = () => {
                 className="input-field w-full"
                 value={filters.type}
                 onChange={(e) => {
-                  const values = Array.from(e.target.selectedOptions, option => option.value);
+                  const values = Array.from(
+                    e.target.selectedOptions,
+                    (option) => option.value,
+                  );
                   applyFilters({ type: values });
                 }}
               >
@@ -285,7 +343,9 @@ const SonarQubeResults = () => {
           transition={{ delay: 0.7 }}
           className="card"
         >
-          <h2 className="text-xl font-bold text-white mb-4">Issues by Severity</h2>
+          <h2 className="text-xl font-bold text-white mb-4">
+            Issues by Severity
+          </h2>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -299,7 +359,10 @@ const SonarQubeResults = () => {
                 dataKey="value"
               >
                 {severityData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}
+                  />
                 ))}
               </Pie>
               <Tooltip />
@@ -315,16 +378,26 @@ const SonarQubeResults = () => {
         >
           <h2 className="text-xl font-bold text-white mb-4">Issues by Type</h2>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={[
-              { name: 'Bugs', value: metrics.bugs || 0 },
-              { name: 'Vulnerabilities', value: metrics.vulnerabilities || 0 },
-              { name: 'Code Smells', value: metrics.code_smells || 0 },
-              { name: 'Hotspots', value: metrics.security_hotspots || 0 },
-            ]}>
+            <BarChart
+              data={[
+                { name: "Bugs", value: metrics.bugs || 0 },
+                {
+                  name: "Vulnerabilities",
+                  value: metrics.vulnerabilities || 0,
+                },
+                { name: "Code Smells", value: metrics.code_smells || 0 },
+                { name: "Hotspots", value: metrics.security_hotspots || 0 },
+              ]}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="name" stroke="#9CA3AF" />
               <YAxis stroke="#9CA3AF" />
-              <Tooltip contentStyle={{ backgroundColor: '#0A0E27', border: '1px solid #00D9FF' }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#0A0E27",
+                  border: "1px solid #00D9FF",
+                }}
+              />
               <Bar dataKey="value" fill="#00D9FF" />
             </BarChart>
           </ResponsiveContainer>
@@ -339,7 +412,9 @@ const SonarQubeResults = () => {
         className="card"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-white">Issues ({pagination.total})</h2>
+          <h2 className="text-xl font-bold text-white">
+            Issues ({pagination.total})
+          </h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -362,18 +437,28 @@ const SonarQubeResults = () => {
                     onClick={() => toggleRow(issue.key)}
                   >
                     <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getSeverityBg(issue.severity)}`}>
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${getSeverityBg(issue.severity)}`}
+                      >
                         {issue.severity}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-gray-300">{issue.type}</td>
-                    <td className="py-3 px-4 text-gray-300 text-sm">{issue.component?.split(':').pop()}</td>
-                    <td className="py-3 px-4 text-gray-300">{issue.line || '-'}</td>
+                    <td className="py-3 px-4 text-gray-300 text-sm">
+                      {issue.component?.split(":").pop()}
+                    </td>
+                    <td className="py-3 px-4 text-gray-300">
+                      {issue.line || "-"}
+                    </td>
                     <td className="py-3 px-4 text-gray-300">{issue.message}</td>
                     <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        issue.status === 'OPEN' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${
+                          issue.status === "OPEN"
+                            ? "bg-yellow-500/20 text-yellow-400"
+                            : "bg-green-500/20 text-green-400"
+                        }`}
+                      >
                         {issue.status}
                       </span>
                     </td>
@@ -383,24 +468,40 @@ const SonarQubeResults = () => {
                       <td colSpan={6} className="py-4 px-4 bg-cyber-dark">
                         <div className="space-y-2">
                           <div>
-                            <strong className="text-cyber-blue">Rule:</strong> {issue.rule_name || issue.rule}
+                            <strong className="text-cyber-blue">Rule:</strong>{" "}
+                            {issue.rule_name || issue.rule}
                           </div>
                           {issue.rule_description && (
                             <div>
-                              <strong className="text-cyber-blue">Description:</strong>
-                              <div className="text-gray-300 mt-1" dangerouslySetInnerHTML={{ __html: issue.rule_description }} />
+                              <strong className="text-cyber-blue">
+                                Description:
+                              </strong>
+                              <div
+                                className="text-gray-300 mt-1"
+                                dangerouslySetInnerHTML={{
+                                  __html: issue.rule_description,
+                                }}
+                              />
                             </div>
                           )}
                           {issue.effort && (
                             <div>
-                              <strong className="text-cyber-blue">Effort:</strong> {issue.effort}
+                              <strong className="text-cyber-blue">
+                                Effort:
+                              </strong>{" "}
+                              {issue.effort}
                             </div>
                           )}
                           {issue.tags && issue.tags.length > 0 && (
                             <div>
-                              <strong className="text-cyber-blue">Tags:</strong>{' '}
-                              {issue.tags.map(tag => (
-                                <span key={tag} className="px-2 py-1 bg-gray-700 rounded text-xs mr-1">{tag}</span>
+                              <strong className="text-cyber-blue">Tags:</strong>{" "}
+                              {issue.tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="px-2 py-1 bg-gray-700 rounded text-xs mr-1"
+                                >
+                                  {tag}
+                                </span>
                               ))}
                             </div>
                           )}
@@ -440,4 +541,3 @@ const SonarQubeResults = () => {
 };
 
 export default SonarQubeResults;
-

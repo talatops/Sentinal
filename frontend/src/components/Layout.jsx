@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { useAuthStore } from "../store/authStore";
 import {
   HomeIcon,
   ShieldExclamationIcon,
@@ -9,7 +9,7 @@ import {
   KeyIcon,
   Bars3Icon,
   XMarkIcon,
-} from '@heroicons/react/24/outline';
+} from "@heroicons/react/24/outline";
 
 const Layout = ({ children }) => {
   const location = useLocation();
@@ -17,10 +17,29 @@ const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: HomeIcon, id: 'dashboard-link' },
-    { name: 'Threat Modeling', href: '/threats', icon: ShieldExclamationIcon, id: 'threats-link' },
-    { name: 'Requirements', href: '/requirements', icon: DocumentTextIcon, id: 'requirements-link' },
-    ...(user?.role === 'Admin' ? [{ name: 'API Tokens', href: '/api-tokens', icon: KeyIcon, id: 'api-tokens-link' }] : []),
+    { name: "Dashboard", href: "/", icon: HomeIcon, id: "dashboard-link" },
+    {
+      name: "Threat Modeling",
+      href: "/threats",
+      icon: ShieldExclamationIcon,
+      id: "threats-link",
+    },
+    {
+      name: "Requirements",
+      href: "/requirements",
+      icon: DocumentTextIcon,
+      id: "requirements-link",
+    },
+    ...(user?.role === "Admin"
+      ? [
+          {
+            name: "API Tokens",
+            href: "/api-tokens",
+            icon: KeyIcon,
+            id: "api-tokens-link",
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -28,9 +47,9 @@ const Layout = ({ children }) => {
       {/* Sidebar */}
       <div
         className={`fixed inset-y-0 left-0 z-40 bg-cyber-dark border-r border-cyber-blue/20 transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
-        style={{ width: '256px' }}
+        style={{ width: "256px" }}
       >
         <div className="flex flex-col h-full">
           {/* Header with hamburger button */}
@@ -51,7 +70,7 @@ const Layout = ({ children }) => {
               )}
             </button>
           </div>
-          
+
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
@@ -63,21 +82,25 @@ const Layout = ({ children }) => {
                   id={item.id}
                   className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 ${
                     isActive
-                      ? 'bg-cyber-blue/20 text-cyber-blue border border-cyber-blue/30 shadow-[0_0_8px_rgba(0,217,255,0.3)]'
-                      : 'text-gray-400 hover:text-white hover:bg-cyber-dark/50 hover:border hover:border-cyber-blue/10'
+                      ? "bg-cyber-blue/20 text-cyber-blue border border-cyber-blue/30 shadow-[0_0_8px_rgba(0,217,255,0.3)]"
+                      : "text-gray-400 hover:text-white hover:bg-cyber-dark/50 hover:border hover:border-cyber-blue/10"
                   }`}
                 >
-                  <item.icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-cyber-blue' : ''}`} />
+                  <item.icon
+                    className={`w-5 h-5 flex-shrink-0 ${isActive ? "text-cyber-blue" : ""}`}
+                  />
                   <span className="font-medium">{item.name}</span>
                 </Link>
               );
             })}
           </nav>
-          
+
           {/* User section */}
           <div className="p-4 border-t border-cyber-blue/20">
             <div className="mb-3">
-              <p className="text-sm font-semibold text-white">{user?.username}</p>
+              <p className="text-sm font-semibold text-white">
+                {user?.username}
+              </p>
               <p className="text-xs text-gray-400 mt-0.5">{user?.role}</p>
             </div>
             <button
@@ -94,12 +117,10 @@ const Layout = ({ children }) => {
       {/* Main content */}
       <div
         className={`transition-all duration-300 ${
-          sidebarOpen ? 'ml-64' : 'ml-0'
+          sidebarOpen ? "ml-64" : "ml-0"
         }`}
       >
-        <div className="p-8">
-          {children}
-        </div>
+        <div className="p-8">{children}</div>
       </div>
 
       {/* Toggle button - visible when sidebar is closed */}
@@ -117,4 +138,3 @@ const Layout = ({ children }) => {
 };
 
 export default Layout;
-

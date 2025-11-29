@@ -1,17 +1,22 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuthStore } from './store/authStore';
-import Dashboard from './pages/Dashboard';
-import ThreatModeling from './pages/ThreatModeling';
-import Requirements from './pages/Requirements';
-import Login from './pages/Login';
-import SonarQubeResults from './pages/SonarQubeResults';
-import ZAPResults from './pages/ZAPResults';
-import TrivyResults from './pages/TrivyResults';
-import APITokens from './pages/APITokens';
-import Layout from './components/Layout';
-import ProtectedRoute from './components/ProtectedRoute';
-import GitHubCallback from './pages/GitHubCallback';
-import OnboardingTour from './components/OnboardingTour';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { useAuthStore } from "./store/authStore";
+import Dashboard from "./pages/Dashboard";
+import ThreatModeling from "./pages/ThreatModeling";
+import Requirements from "./pages/Requirements";
+import Login from "./pages/Login";
+import SonarQubeResults from "./pages/SonarQubeResults";
+import ZAPResults from "./pages/ZAPResults";
+import TrivyResults from "./pages/TrivyResults";
+import APITokens from "./pages/APITokens";
+import Layout from "./components/Layout";
+import ProtectedRoute from "./components/ProtectedRoute";
+import GitHubCallback from "./pages/GitHubCallback";
+import OnboardingTour from "./components/OnboardingTour";
 
 function App() {
   const { isAuthenticated } = useAuthStore();
@@ -19,7 +24,10 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
+        <Route
+          path="/login"
+          element={!isAuthenticated ? <Login /> : <Navigate to="/" />}
+        />
         <Route
           path="/"
           element={

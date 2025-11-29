@@ -1,6 +1,6 @@
-import { io } from 'socket.io-client';
+import { io } from "socket.io-client";
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost';
+const WS_URL = import.meta.env.VITE_WS_URL || "http://localhost";
 
 class WebSocketService {
   constructor() {
@@ -15,30 +15,30 @@ class WebSocketService {
     }
 
     this.socket = io(WS_URL, {
-      transports: ['websocket', 'polling'],
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
     });
 
-    this.socket.on('connect', () => {
-      console.log('WebSocket connected');
+    this.socket.on("connect", () => {
+      console.log("WebSocket connected");
       this.connected = true;
-      this.emit('connected', {});
+      this.emit("connected", {});
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('WebSocket disconnected');
+    this.socket.on("disconnect", () => {
+      console.log("WebSocket disconnected");
       this.connected = false;
     });
 
-    this.socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error);
+    this.socket.on("connect_error", (error) => {
+      console.error("WebSocket connection error:", error);
       this.connected = false;
     });
 
     // Subscribe to dashboard updates by default
-    this.socket.emit('subscribe_dashboard');
+    this.socket.emit("subscribe_dashboard");
   }
 
   disconnect() {
@@ -51,13 +51,13 @@ class WebSocketService {
 
   subscribeToScan(runId) {
     if (this.socket && this.connected) {
-      this.socket.emit('subscribe_scan', { run_id: runId });
+      this.socket.emit("subscribe_scan", { run_id: runId });
     }
   }
 
   unsubscribeFromScan(runId) {
     if (this.socket && this.connected) {
-      this.socket.emit('unsubscribe_scan', { run_id: runId });
+      this.socket.emit("unsubscribe_scan", { run_id: runId });
     }
   }
 
@@ -101,4 +101,3 @@ class WebSocketService {
 const wsService = new WebSocketService();
 
 export default wsService;
-

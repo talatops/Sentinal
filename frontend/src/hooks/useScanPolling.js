@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { cicdService } from '../services/cicdService';
+import { useState, useEffect, useRef } from "react";
+import { cicdService } from "../services/cicdService";
 
 /**
  * Hook for polling scan status
@@ -27,14 +27,14 @@ const useScanPolling = (scanType, scanId, enabled = true, interval = 5000) => {
         setStatus(result);
 
         // Stop polling if scan is completed or failed
-        if (result.status === 'completed' || result.status === 'failed') {
+        if (result.status === "completed" || result.status === "failed") {
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
         }
       } catch (err) {
-        console.error('Polling error:', err);
+        console.error("Polling error:", err);
         setError(err.message);
         // Stop polling on error
         if (intervalRef.current) {
@@ -78,4 +78,3 @@ const useScanPolling = (scanType, scanId, enabled = true, interval = 5000) => {
 };
 
 export default useScanPolling;
-

@@ -1,19 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 // eslint-disable-next-line no-unused-vars
-import { motion } from 'framer-motion';
-import { requirementService } from '../services/requirementService';
-import { useAuthStore } from '../store/authStore';
-import { z } from 'zod';
+import { motion } from "framer-motion";
+import { requirementService } from "../services/requirementService";
+import { useAuthStore } from "../store/authStore";
+import { z } from "zod";
 
 const requirementSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
+  title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  security_controls: z.array(z.object({
-    name: z.string().min(1, 'Control name is required'),
-    description: z.string().optional(),
-    owasp_asvs_level: z.string().optional(),
-  })).min(1, 'At least one security control is required'),
-  status: z.enum(['Draft', 'Review', 'Approved', 'Implemented']).optional(),
+  security_controls: z
+    .array(
+      z.object({
+        name: z.string().min(1, "Control name is required"),
+        description: z.string().optional(),
+        owasp_asvs_level: z.string().optional(),
+      }),
+    )
+    .min(1, "At least one security control is required"),
+  status: z.enum(["Draft", "Review", "Approved", "Implemented"]).optional(),
   owasp_asvs_level: z.string().optional(),
 });
 
@@ -23,18 +27,18 @@ const Requirements = () => {
   const [compliance, setCompliance] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    security_controls: [{ name: '', description: '', owasp_asvs_level: '' }],
-    status: 'Draft',
-    owasp_asvs_level: '',
+    title: "",
+    description: "",
+    security_controls: [{ name: "", description: "", owasp_asvs_level: "" }],
+    status: "Draft",
+    owasp_asvs_level: "",
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
     loadRequirements();
-    if (user?.role === 'Admin') {
+    if (user?.role === "Admin") {
       loadCompliance();
     }
   }, [user]);
@@ -44,7 +48,7 @@ const Requirements = () => {
       const data = await requirementService.getRequirements();
       setRequirements(data.requirements || []);
     } catch (error) {
-      console.error('Failed to load requirements:', error);
+      console.error("Failed to load requirements:", error);
     }
   };
 
@@ -53,7 +57,7 @@ const Requirements = () => {
       const data = await requirementService.getCompliance();
       setCompliance(data);
     } catch (error) {
-      console.error('Failed to load compliance:', error);
+      console.error("Failed to load compliance:", error);
     }
   };
 
@@ -68,11 +72,13 @@ const Requirements = () => {
       await loadRequirements();
       setShowForm(false);
       setFormData({
-        title: '',
-        description: '',
-        security_controls: [{ name: '', description: '', owasp_asvs_level: '' }],
-        status: 'Draft',
-        owasp_asvs_level: '',
+        title: "",
+        description: "",
+        security_controls: [
+          { name: "", description: "", owasp_asvs_level: "" },
+        ],
+        status: "Draft",
+        owasp_asvs_level: "",
       });
     } catch (error) {
       if (error.errors) {
@@ -82,7 +88,7 @@ const Requirements = () => {
         });
         setErrors(zodErrors);
       } else {
-        setErrors({ submit: 'Failed to create requirement' });
+        setErrors({ submit: "Failed to create requirement" });
       }
     } finally {
       setLoading(false);
@@ -92,7 +98,10 @@ const Requirements = () => {
   const addSecurityControl = () => {
     setFormData((prev) => ({
       ...prev,
-      security_controls: [...prev.security_controls, { name: '', description: '', owasp_asvs_level: '' }],
+      security_controls: [
+        ...prev.security_controls,
+        { name: "", description: "", owasp_asvs_level: "" },
+      ],
     }));
   };
 
@@ -114,23 +123,25 @@ const Requirements = () => {
   const handleExport = async (format) => {
     try {
       const data = await requirementService.exportRequirements(format);
-      if (format === 'csv') {
-        const blob = new Blob([data.data], { type: 'text/csv' });
+      if (format === "csv") {
+        const blob = new Blob([data.data], { type: "text/csv" });
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
-        a.download = 'requirements.csv';
+        a.download = "requirements.csv";
         a.click();
       } else {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify(data, null, 2)], {
+          type: "application/json",
+        });
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
-        a.download = 'requirements.json';
+        a.download = "requirements.json";
         a.click();
       }
     } catch (error) {
-      console.error('Export failed:', error);
+      console.error("Export failed:", error);
     }
   };
 
@@ -142,48 +153,63 @@ const Requirements = () => {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Requirements Management</h1>
-          <p className="text-gray-400">Manage requirements with security controls</p>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Requirements Management
+          </h1>
+          <p className="text-gray-400">
+            Manage requirements with security controls
+          </p>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => handleExport('json')}
+            onClick={() => handleExport("json")}
             className="px-4 py-2 bg-cyber-dark border border-cyber-blue/20 rounded-lg hover:border-cyber-blue transition-colors"
           >
             Export JSON
           </button>
           <button
-            onClick={() => handleExport('csv')}
+            onClick={() => handleExport("csv")}
             className="px-4 py-2 bg-cyber-dark border border-cyber-blue/20 rounded-lg hover:border-cyber-blue transition-colors"
           >
             Export CSV
           </button>
-          <button onClick={() => setShowForm(!showForm)} className="btn-primary">
-            {showForm ? 'Cancel' : 'New Requirement'}
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="btn-primary"
+          >
+            {showForm ? "Cancel" : "New Requirement"}
           </button>
         </div>
       </motion.div>
 
       {/* Compliance Dashboard (Admin only) */}
-      {compliance && user?.role === 'Admin' && (
+      {compliance && user?.role === "Admin" && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="card"
         >
-          <h2 className="text-xl font-bold text-white mb-4">Compliance Dashboard</h2>
+          <h2 className="text-xl font-bold text-white mb-4">
+            Compliance Dashboard
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-gray-400">Total Requirements</p>
-              <p className="text-2xl font-bold text-white">{compliance.total_requirements}</p>
+              <p className="text-2xl font-bold text-white">
+                {compliance.total_requirements}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-400">With Controls</p>
-              <p className="text-2xl font-bold text-white">{compliance.requirements_with_controls}</p>
+              <p className="text-2xl font-bold text-white">
+                {compliance.requirements_with_controls}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-400">Compliance Rate</p>
-              <p className="text-2xl font-bold text-cyber-green">{compliance.compliance_rate}%</p>
+              <p className="text-2xl font-bold text-cyber-green">
+                {compliance.compliance_rate}%
+              </p>
             </div>
           </div>
         </motion.div>
@@ -196,33 +222,53 @@ const Requirements = () => {
           animate={{ opacity: 1, y: 0 }}
           className="card"
         >
-          <h2 className="text-xl font-bold text-white mb-4">Create Requirement</h2>
+          <h2 className="text-xl font-bold text-white mb-4">
+            Create Requirement
+          </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">Title</label>
               <input
                 type="text"
                 value={formData.title}
-                onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, title: e.target.value }))
+                }
                 className="input-field w-full"
               />
-              {errors.title && <p className="text-red-400 text-sm mt-1">{errors.title}</p>}
+              {errors.title && (
+                <p className="text-red-400 text-sm mt-1">{errors.title}</p>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Description</label>
+              <label className="block text-sm font-medium mb-2">
+                Description
+              </label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 className="input-field w-full h-24"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">OWASP ASVS Level</label>
+              <label className="block text-sm font-medium mb-2">
+                OWASP ASVS Level
+              </label>
               <select
                 value={formData.owasp_asvs_level}
-                onChange={(e) => setFormData((prev) => ({ ...prev, owasp_asvs_level: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    owasp_asvs_level: e.target.value,
+                  }))
+                }
                 className="input-field w-full"
               >
                 <option value="">Select Level</option>
@@ -234,7 +280,9 @@ const Requirements = () => {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium">Security Controls</label>
+                <label className="block text-sm font-medium">
+                  Security Controls
+                </label>
                 <button
                   type="button"
                   onClick={addSecurityControl}
@@ -246,7 +294,9 @@ const Requirements = () => {
               {formData.security_controls.map((control, index) => (
                 <div key={index} className="mb-4 p-4 bg-cyber-dark rounded-lg">
                   <div className="flex justify-between mb-2">
-                    <span className="text-sm text-gray-400">Control {index + 1}</span>
+                    <span className="text-sm text-gray-400">
+                      Control {index + 1}
+                    </span>
                     {formData.security_controls.length > 1 && (
                       <button
                         type="button"
@@ -260,19 +310,33 @@ const Requirements = () => {
                   <input
                     type="text"
                     value={control.name}
-                    onChange={(e) => updateSecurityControl(index, 'name', e.target.value)}
+                    onChange={(e) =>
+                      updateSecurityControl(index, "name", e.target.value)
+                    }
                     placeholder="Control name"
                     className="input-field w-full mb-2"
                   />
                   <textarea
                     value={control.description}
-                    onChange={(e) => updateSecurityControl(index, 'description', e.target.value)}
+                    onChange={(e) =>
+                      updateSecurityControl(
+                        index,
+                        "description",
+                        e.target.value,
+                      )
+                    }
                     placeholder="Description"
                     className="input-field w-full mb-2"
                   />
                   <select
                     value={control.owasp_asvs_level}
-                    onChange={(e) => updateSecurityControl(index, 'owasp_asvs_level', e.target.value)}
+                    onChange={(e) =>
+                      updateSecurityControl(
+                        index,
+                        "owasp_asvs_level",
+                        e.target.value,
+                      )
+                    }
                     className="input-field w-full"
                   >
                     <option value="">Select ASVS Level</option>
@@ -283,7 +347,9 @@ const Requirements = () => {
                 </div>
               ))}
               {errors.security_controls && (
-                <p className="text-red-400 text-sm mt-1">{errors.security_controls}</p>
+                <p className="text-red-400 text-sm mt-1">
+                  {errors.security_controls}
+                </p>
               )}
             </div>
 
@@ -293,8 +359,12 @@ const Requirements = () => {
               </div>
             )}
 
-            <button type="submit" disabled={loading} className="btn-primary w-full">
-              {loading ? 'Creating...' : 'Create Requirement'}
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full"
+            >
+              {loading ? "Creating..." : "Create Requirement"}
             </button>
           </form>
         </motion.div>
@@ -310,7 +380,9 @@ const Requirements = () => {
         <h2 className="text-xl font-bold text-white mb-4">Requirements</h2>
         <div className="space-y-2">
           {requirements.length === 0 ? (
-            <p className="text-gray-400 text-center py-8">No requirements yet</p>
+            <p className="text-gray-400 text-center py-8">
+              No requirements yet
+            </p>
           ) : (
             requirements.map((req) => (
               <div
@@ -320,7 +392,9 @@ const Requirements = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h3 className="font-medium text-white mb-1">{req.title}</h3>
-                    <p className="text-sm text-gray-400 mb-2">{req.description}</p>
+                    <p className="text-sm text-gray-400 mb-2">
+                      {req.description}
+                    </p>
                     <div className="flex gap-2 flex-wrap">
                       <span className="px-2 py-1 bg-cyber-blue/20 text-cyber-blue rounded text-xs">
                         {req.status}
@@ -346,4 +420,3 @@ const Requirements = () => {
 };
 
 export default Requirements;
-

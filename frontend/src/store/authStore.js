@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { authService } from '../services/auth';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { authService } from "../services/auth";
 
 const useAuthStore = create(
   persist(
@@ -9,7 +9,7 @@ const useAuthStore = create(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
-      
+
       login: async (username, password) => {
         try {
           const response = await authService.login(username, password);
@@ -24,11 +24,11 @@ const useAuthStore = create(
           return { success: false, error: error.message };
         }
       },
-      
+
       loginWithGitHub: () => {
         authService.initiateGitHubAuth();
       },
-      
+
       logout: () => {
         authService.logout();
         set({
@@ -38,26 +38,25 @@ const useAuthStore = create(
           isAuthenticated: false,
         });
       },
-      
+
       setTokens: (accessToken, refreshToken) => {
         set({ accessToken, refreshToken });
       },
-      
+
       setUser: (user) => {
         set({ user, isAuthenticated: true });
       },
     }),
     {
-      name: 'auth-storage',
+      name: "auth-storage",
       partialize: (state) => ({
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
-    }
-  )
+    },
+  ),
 );
 
 export { useAuthStore };
-

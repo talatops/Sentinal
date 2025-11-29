@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 // eslint-disable-next-line no-unused-vars
-import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { cicdService } from '../services/cicdService';
-import wsService from '../services/websocket';
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { cicdService } from "../services/cicdService";
+import wsService from "../services/websocket";
 import {
   ChartBarIcon,
   CheckCircleIcon,
@@ -12,8 +12,17 @@ import {
   ShieldExclamationIcon,
   CodeBracketIcon,
   BugAntIcon,
-} from '@heroicons/react/24/outline';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+} from "@heroicons/react/24/outline";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -29,7 +38,7 @@ const Dashboard = () => {
     try {
       const data = await cicdService.getDashboard();
       setDashboardData(data);
-      
+
       // Load latest scan summaries
       try {
         const [sonarqube, zap, trivy] = await Promise.allSettled([
@@ -37,40 +46,52 @@ const Dashboard = () => {
           cicdService.getLatestZAP(),
           cicdService.getLatestTrivy(),
         ]);
-        
+
         setScanSummaries({
-          sonarqube: sonarqube.status === 'fulfilled' && sonarqube.value.sast_results ? sonarqube.value.sast_results : null,
-          zap: zap.status === 'fulfilled' && zap.value.dast_results ? zap.value.dast_results : null,
-          trivy: trivy.status === 'fulfilled' && trivy.value.trivy_results ? trivy.value.trivy_results : null,
+          sonarqube:
+            sonarqube.status === "fulfilled" && sonarqube.value.sast_results
+              ? sonarqube.value.sast_results
+              : null,
+          zap:
+            zap.status === "fulfilled" && zap.value.dast_results
+              ? zap.value.dast_results
+              : null,
+          trivy:
+            trivy.status === "fulfilled" && trivy.value.trivy_results
+              ? trivy.value.trivy_results
+              : null,
         });
       } catch (error) {
-        console.error('Failed to load scan summaries:', error);
+        console.error("Failed to load scan summaries:", error);
       }
     } catch (error) {
-      console.error('Failed to load dashboard:', error);
+      console.error("Failed to load dashboard:", error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const handleDashboardUpdate = useCallback((update) => {
-    console.log('Dashboard update received:', update);
-    
-    if (update.type === 'new_run' || update.type === 'scan_completed') {
-      // Reload dashboard data when new run is created or scan completes
-      loadDashboard();
-    }
-  }, [loadDashboard]);
+  const handleDashboardUpdate = useCallback(
+    (update) => {
+      console.log("Dashboard update received:", update);
+
+      if (update.type === "new_run" || update.type === "scan_completed") {
+        // Reload dashboard data when new run is created or scan completes
+        loadDashboard();
+      }
+    },
+    [loadDashboard],
+  );
 
   useEffect(() => {
     // Connect to WebSocket
     wsService.connect();
-    
+
     // Subscribe to dashboard updates
-    wsService.on('dashboard_update', handleDashboardUpdate);
-    wsService.on('connected', () => {
-      console.log('WebSocket connected, subscribing to dashboard');
-      wsService.emit('subscribe_dashboard');
+    wsService.on("dashboard_update", handleDashboardUpdate);
+    wsService.on("connected", () => {
+      console.log("WebSocket connected, subscribing to dashboard");
+      wsService.emit("subscribe_dashboard");
     });
 
     // Load initial dashboard data
@@ -78,7 +99,7 @@ const Dashboard = () => {
 
     // Cleanup on unmount
     return () => {
-      wsService.off('dashboard_update', handleDashboardUpdate);
+      wsService.off("dashboard_update", handleDashboardUpdate);
     };
   }, [handleDashboardUpdate, loadDashboard]);
 
@@ -92,28 +113,28 @@ const Dashboard = () => {
 
   const stats = [
     {
-      name: 'Total Runs',
+      name: "Total Runs",
       value: dashboardData?.total_runs || 0,
       icon: ChartBarIcon,
-      color: 'text-cyber-blue',
+      color: "text-cyber-blue",
     },
     {
-      name: 'Successful',
+      name: "Successful",
       value: dashboardData?.successful_runs || 0,
       icon: CheckCircleIcon,
-      color: 'text-cyber-green',
+      color: "text-cyber-green",
     },
     {
-      name: 'Failed',
+      name: "Failed",
       value: dashboardData?.failed_runs || 0,
       icon: XCircleIcon,
-      color: 'text-red-500',
+      color: "text-red-500",
     },
     {
-      name: 'Blocked',
+      name: "Blocked",
       value: dashboardData?.blocked_runs || 0,
       icon: ClockIcon,
-      color: 'text-yellow-500',
+      color: "text-yellow-500",
     },
   ];
 
@@ -140,7 +161,9 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm">{stat.name}</p>
-                <p className="text-3xl font-bold text-white mt-2">{stat.value}</p>
+                <p className="text-3xl font-bold text-white mt-2">
+                  {stat.value}
+                </p>
               </div>
               <stat.icon className={`w-12 h-12 ${stat.color}`} />
             </div>
@@ -179,16 +202,33 @@ const Dashboard = () => {
           transition={{ delay: 0.5 }}
           className="card"
         >
-          <h2 className="text-xl font-bold text-white mb-4">Vulnerability Trend</h2>
+          <h2 className="text-xl font-bold text-white mb-4">
+            Vulnerability Trend
+          </h2>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={dashboardData.vulnerability_trend}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="date" stroke="#9CA3AF" />
               <YAxis stroke="#9CA3AF" />
-              <Tooltip contentStyle={{ backgroundColor: '#0A0E27', border: '1px solid #00D9FF' }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#0A0E27",
+                  border: "1px solid #00D9FF",
+                }}
+              />
               <Legend />
-              <Line type="monotone" dataKey="critical" stroke="#EF4444" name="Critical" />
-              <Line type="monotone" dataKey="total" stroke="#00D9FF" name="Total" />
+              <Line
+                type="monotone"
+                dataKey="critical"
+                stroke="#EF4444"
+                name="Critical"
+              />
+              <Line
+                type="monotone"
+                dataKey="total"
+                stroke="#00D9FF"
+                name="Total"
+              />
             </LineChart>
           </ResponsiveContainer>
         </motion.div>
@@ -202,16 +242,23 @@ const Dashboard = () => {
         className="grid grid-cols-1 md:grid-cols-3 gap-6"
       >
         {/* SonarQube Card */}
-        <div className="card cursor-pointer hover:border-cyber-blue transition-colors" onClick={() => navigate('/scans/sonarqube')}>
+        <div
+          className="card cursor-pointer hover:border-cyber-blue transition-colors"
+          onClick={() => navigate("/scans/sonarqube")}
+        >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <CodeBracketIcon className="w-6 h-6 text-cyber-blue" />
               SonarQube (SAST)
             </h3>
             {scanSummaries.sonarqube && (
-              <span className={`px-2 py-1 rounded text-xs ${
-                scanSummaries.sonarqube.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
-              }`}>
+              <span
+                className={`px-2 py-1 rounded text-xs ${
+                  scanSummaries.sonarqube.status === "completed"
+                    ? "bg-green-500/20 text-green-400"
+                    : "bg-yellow-500/20 text-yellow-400"
+                }`}
+              >
                 {scanSummaries.sonarqube.status}
               </span>
             )}
@@ -220,18 +267,26 @@ const Dashboard = () => {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-gray-400">Critical Issues:</span>
-                <span className="text-red-400 font-bold">{scanSummaries.sonarqube.critical || 0}</span>
+                <span className="text-red-400 font-bold">
+                  {scanSummaries.sonarqube.critical || 0}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Total Issues:</span>
-                <span className="text-white font-bold">{scanSummaries.sonarqube.total || 0}</span>
+                <span className="text-white font-bold">
+                  {scanSummaries.sonarqube.total || 0}
+                </span>
               </div>
               {scanSummaries.sonarqube.quality_gate && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">Quality Gate:</span>
-                  <span className={`font-bold ${
-                    scanSummaries.sonarqube.quality_gate.status === 'PASSED' ? 'text-green-400' : 'text-red-400'
-                  }`}>
+                  <span
+                    className={`font-bold ${
+                      scanSummaries.sonarqube.quality_gate.status === "PASSED"
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                  >
                     {scanSummaries.sonarqube.quality_gate.status}
                   </span>
                 </div>
@@ -239,7 +294,9 @@ const Dashboard = () => {
               {scanSummaries.sonarqube.metrics?.coverage !== undefined && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">Coverage:</span>
-                  <span className="text-cyber-green font-bold">{scanSummaries.sonarqube.metrics.coverage.toFixed(1)}%</span>
+                  <span className="text-cyber-green font-bold">
+                    {scanSummaries.sonarqube.metrics.coverage.toFixed(1)}%
+                  </span>
                 </div>
               )}
             </div>
@@ -252,16 +309,23 @@ const Dashboard = () => {
         </div>
 
         {/* ZAP Card */}
-        <div className="card cursor-pointer hover:border-cyber-blue transition-colors" onClick={() => navigate('/scans/zap')}>
+        <div
+          className="card cursor-pointer hover:border-cyber-blue transition-colors"
+          onClick={() => navigate("/scans/zap")}
+        >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <ShieldExclamationIcon className="w-6 h-6 text-orange-500" />
               OWASP ZAP (DAST)
             </h3>
             {scanSummaries.zap && (
-              <span className={`px-2 py-1 rounded text-xs ${
-                scanSummaries.zap.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
-              }`}>
+              <span
+                className={`px-2 py-1 rounded text-xs ${
+                  scanSummaries.zap.status === "completed"
+                    ? "bg-green-500/20 text-green-400"
+                    : "bg-yellow-500/20 text-yellow-400"
+                }`}
+              >
                 {scanSummaries.zap.status}
               </span>
             )}
@@ -270,16 +334,22 @@ const Dashboard = () => {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-gray-400">High Risk Alerts:</span>
-                <span className="text-red-400 font-bold">{scanSummaries.zap.high || 0}</span>
+                <span className="text-red-400 font-bold">
+                  {scanSummaries.zap.high || 0}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Total Alerts:</span>
-                <span className="text-white font-bold">{scanSummaries.zap.total || 0}</span>
+                <span className="text-white font-bold">
+                  {scanSummaries.zap.total || 0}
+                </span>
               </div>
               {scanSummaries.zap.spider_results && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">URLs Scanned:</span>
-                  <span className="text-white font-bold">{scanSummaries.zap.spider_results.urls_found || 0}</span>
+                  <span className="text-white font-bold">
+                    {scanSummaries.zap.spider_results.urls_found || 0}
+                  </span>
                 </div>
               )}
             </div>
@@ -292,16 +362,23 @@ const Dashboard = () => {
         </div>
 
         {/* Trivy Card */}
-        <div className="card cursor-pointer hover:border-cyber-blue transition-colors" onClick={() => navigate('/scans/trivy')}>
+        <div
+          className="card cursor-pointer hover:border-cyber-blue transition-colors"
+          onClick={() => navigate("/scans/trivy")}
+        >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <BugAntIcon className="w-6 h-6 text-purple-500" />
               Trivy (Container)
             </h3>
             {scanSummaries.trivy && (
-              <span className={`px-2 py-1 rounded text-xs ${
-                scanSummaries.trivy.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
-              }`}>
+              <span
+                className={`px-2 py-1 rounded text-xs ${
+                  scanSummaries.trivy.status === "completed"
+                    ? "bg-green-500/20 text-green-400"
+                    : "bg-yellow-500/20 text-yellow-400"
+                }`}
+              >
                 {scanSummaries.trivy.status}
               </span>
             )}
@@ -310,16 +387,22 @@ const Dashboard = () => {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-gray-400">Critical CVEs:</span>
-                <span className="text-red-400 font-bold">{scanSummaries.trivy.critical || 0}</span>
+                <span className="text-red-400 font-bold">
+                  {scanSummaries.trivy.critical || 0}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Total Vulnerabilities:</span>
-                <span className="text-white font-bold">{scanSummaries.trivy.total || 0}</span>
+                <span className="text-white font-bold">
+                  {scanSummaries.trivy.total || 0}
+                </span>
               </div>
               {scanSummaries.trivy.os_packages && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">OS Packages:</span>
-                  <span className="text-white font-bold">{scanSummaries.trivy.os_packages.total || 0}</span>
+                  <span className="text-white font-bold">
+                    {scanSummaries.trivy.os_packages.total || 0}
+                  </span>
                 </div>
               )}
             </div>
@@ -358,13 +441,13 @@ const Dashboard = () => {
                 </div>
                 <span
                   className={`px-3 py-1 rounded text-xs font-medium ${
-                    run.status === 'Success'
-                      ? 'bg-green-500/20 text-green-400'
-                      : run.status === 'Failed'
-                      ? 'bg-red-500/20 text-red-400'
-                      : run.status === 'Blocked'
-                      ? 'bg-yellow-500/20 text-yellow-400'
-                      : 'bg-gray-500/20 text-gray-400'
+                    run.status === "Success"
+                      ? "bg-green-500/20 text-green-400"
+                      : run.status === "Failed"
+                        ? "bg-red-500/20 text-red-400"
+                        : run.status === "Blocked"
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : "bg-gray-500/20 text-gray-400"
                   }`}
                 >
                   {run.status}
@@ -379,4 +462,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
