@@ -219,3 +219,6 @@ See `.docker.env.example` for all required environment variables.
 ## API Documentation
 
 API documentation is available at `/api/docs` (if Swagger is configured) or see `techdocs/api-documentation.md`.
+
+
+<!-- Updated by saad -->
