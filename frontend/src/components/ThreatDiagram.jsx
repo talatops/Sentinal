@@ -6,6 +6,7 @@ import ReactFlow, {
   MarkerType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 
 const ThreatDiagram = ({ threat, onNodeClick }) => {
@@ -18,7 +19,6 @@ const ThreatDiagram = ({ threat, onNodeClick }) => {
 
     // Parse flow description to extract components
     const flow = threat.flow.toLowerCase();
-    const asset = threat.asset;
 
     // Extract components from flow
     const components = [];

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { requirementService } from '../services/requirementService';
 import { useAuthStore } from '../store/authStore';

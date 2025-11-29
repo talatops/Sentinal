@@ -77,7 +77,7 @@ export const secureStorage = {
       }
       
       return item.value;
-    } catch (e) {
+    } catch {
       localStorage.removeItem(key);
       return null;
     }
