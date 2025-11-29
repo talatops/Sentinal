@@ -106,6 +106,11 @@ jobs:
         run: |
           flask db upgrade || echo "No migrations to run"
       
+      - name: Create logs directory
+        working-directory: ./backend
+        run: |
+          mkdir -p logs || true
+      
       - name: Run backend tests with coverage
         working-directory: ./backend
         env:

@@ -135,7 +135,11 @@ class DREADScorer:
             # Higher confidence for scores that align with matched patterns
             if matched_patterns:
                 # Check if this score dimension is commonly high in matched patterns
-                pattern_scores = [data["suggested_dread"][key] for _, _, data in matched_patterns]
+                pattern_scores = [
+                    data["suggested_dread"][key]
+                    for _, _, data in matched_patterns
+                    if "suggested_dread" in data and key in data["suggested_dread"]
+                ]
                 if pattern_scores:
                     avg_pattern_score = sum(pattern_scores) / len(pattern_scores)
                     score_diff = abs(scores[key] - avg_pattern_score)
