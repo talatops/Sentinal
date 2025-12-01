@@ -42,9 +42,6 @@ services:
       SONARQUBE_URL: ${SONARQUBE_URL:-http://sonarqube:9000}
       SONARQUBE_TOKEN: ${SONARQUBE_TOKEN}
       SONARQUBE_PROJECT_KEY: ${SONARQUBE_PROJECT_KEY:-sentinal}
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
     depends_on:
       postgres:
         condition: service_healthy
