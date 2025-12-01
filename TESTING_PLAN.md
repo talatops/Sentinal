@@ -750,7 +750,7 @@ Add the following secrets (one at a time):
 - **Value:** (The token you generated in SonarQube UI)
 - **Description:** SonarQube authentication token
 
-#### 2.5: SonarQube Project Key & Properties
+#### 2.5: SonarQube Project Key
 
 - **Project key used in CI:** `sentinal`
 - The repository root now contains `sonar-project.properties` with the following important fields:
