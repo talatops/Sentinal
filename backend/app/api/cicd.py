@@ -174,8 +174,17 @@ class CICDWebhook(Resource):
 
         try:
             if scan_type == "sonarqube":
-                run.sast_results = scan_results
-                emit_scan_update(run.id, "sast_progress", {"status": status, "results": scan_results})
+                # For SonarQube we don't rely on the minimal CI payload.
+                # Instead, fetch full results directly from SonarQube so the
+                # dashboard and detailed views have rich data (issues, metrics, etc.).
+                scanner = SecurityScanner()
+                full_results = scanner.run_sast_scan(commit_hash)
+                run.sast_results = full_results
+                emit_scan_update(
+                    run.id,
+                    "sast_progress",
+                    {"status": full_results.get("status", status), "results": full_results},
+                )
 
             elif scan_type == "zap":
                 run.dast_results = scan_results
