@@ -322,7 +322,10 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONARQUBE_URL }}
+          SONAR_PROJECT_KEY: sentinal
+
         continue-on-error: true
+
       
       - name: Skip SonarQube Scan
         if: steps.check_sonar.outputs.configured == 'false'
@@ -379,7 +382,19 @@ jobs:
     needs: [smoke-test]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: false
+          tags: sentinal-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Run Trivy vulnerability scanner
         id: trivy
         uses: aquasecurity/trivy-action@master
@@ -429,6 +444,28 @@ jobs:
     needs: [smoke-test]
     steps:
       - uses: actions/checkout@v4
+      - name: Create test environment file
+        run: |
+          cat > .docker.env << EOF
+          POSTGRES_USER=test_user
+          POSTGRES_PASSWORD=test_password_32_chars_long
+          POSTGRES_DB=test_sentinal
+          DATABASE_URL=postgresql://test_user:test_password_32_chars_long@postgres:5432/test_sentinal
+          SECRET_KEY=test_secret_key_32_characters_long
+          JWT_SECRET_KEY=test_jwt_secret_key_32_characters_long
+
+      - name: Start application services for ZAP
+        run: |
+          docker compose --env-file .docker.env up -d postgres backend frontend
+          echo "Waiting for backend to be ready..."
+          for i in {1..30}; do
+            if curl -f http://localhost/api/health 2>/dev/null; then
+              echo "✅ Backend is ready!"
+              break
+            fi
+            echo "Attempt $i/30: Waiting for backend..."
+            sleep 2
+          done
       
       - name: ZAP Baseline Scan
         id: zap
@@ -463,6 +500,10 @@ jobs:
                 \"branch\": \"${{ github.ref_name }}\"
               }
             }" || echo "⚠️ Failed to send results to dashboard"
+
+      - name: Cleanup
+        run: |
+          docker compose --env-file .docker.env down -v || true
 
   deployment-gate:
     name: Deployment Gate
