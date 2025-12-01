@@ -69,6 +69,7 @@ def noisy_score(value, unused_flag=False):  # noqa: ARG002
 # INTENTIONAL SECURITY VULNERABILITIES (for SonarQube detection)
 # ============================================================================
 
+
 def hardcoded_secret_example():
     """INTENTIONAL: Hardcoded password/secret - SonarQube should flag this."""
     password = "admin123"  # noqa: S105
@@ -165,6 +166,7 @@ def weak_ssl_tls_example():
     """INTENTIONAL: Weak SSL/TLS configuration."""
     # SonarQube should flag this as a security hotspot
     import ssl
+
     context = ssl.create_default_context()
     context.check_hostname = False  # noqa: S501
     context.verify_mode = ssl.CERT_NONE  # noqa: S501
