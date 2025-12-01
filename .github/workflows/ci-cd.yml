@@ -328,10 +328,226 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONARQUBE_URL }}
           SONAR_PROJECT_KEY: sentinal
-          
-
         continue-on-error: true
 
+      - name: Parse SonarQube results
+        if: always() && steps.check_sonar.outputs.configured == 'true'
+        id: parse_sonar
+        env:
+          SONARQUBE_URL: ${{ secrets.SONARQUBE_URL }}
+          SONARQUBE_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          SONARQUBE_PROJECT_KEY: sentinal
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          python3 << 'PYEOF'
+          import base64
+          import json
+          import os
+          from datetime import datetime
+          from urllib import request, parse, error
+          
+          base_url = os.environ.get("SONARQUBE_URL", "").rstrip("/")
+          token = os.environ.get("SONARQUBE_TOKEN", "")
+          project_key = os.environ.get("SONARQUBE_PROJECT_KEY", "sentinal")
+          commit_hash = os.environ.get("GITHUB_SHA", "")
+          branch = os.environ.get("GITHUB_REF_NAME", "")
+          
+          if not base_url or not token:
+              print("SonarQube URL or token not configured, skipping parse.")
+              raise SystemExit(0)
+          
+          def make_request(path, params=None):
+              url = f"{base_url}{path}"
+              if params:
+                  qs = parse.urlencode(params, doseq=True)
+                  url = f"{url}?{qs}"
+              req = request.Request(url)
+              # Basic auth: token as username, empty password
+              auth_bytes = f"{token}:".encode("utf-8")
+              auth_header = base64.b64encode(auth_bytes).decode("ascii")
+              req.add_header("Authorization", f"Basic {auth_header}")
+              try:
+                  with request.urlopen(req, timeout=30) as resp:
+                      if resp.status != 200:
+                          print(f"SonarQube API error {resp.status} for {url}")
+                          return None
+                      return json.loads(resp.read().decode("utf-8"))
+              except error.HTTPError as e:
+                  print(f"HTTPError calling {url}: {e.code} {e.reason}")
+                  return None
+              except Exception as e:
+                  print(f"Error calling {url}: {e}")
+                  return None
+          
+          # Gather all unresolved issues with pagination
+          all_issues = []
+          page = 1
+          page_size = 500
+          
+          while True:
+              data = make_request(
+                  "/api/issues/search",
+                  {
+                      "componentKeys": project_key,
+                      "p": page,
+                      "ps": page_size,
+                      "resolved": "false",
+                  },
+              )
+              if not data:
+                  break
+              issues = data.get("issues", [])
+              all_issues.extend(issues)
+              paging = data.get("paging", {})
+              page_index = paging.get("pageIndex", 0)
+              page_size_val = paging.get("pageSize", 0)
+              total = paging.get("total", 0)
+              if page_index * page_size_val >= total:
+                  break
+              page += 1
+          
+          print(f"Collected {len(all_issues)} unresolved issues from SonarQube.")
+          
+          # Fetch metrics
+          metrics = {}
+          metrics_data = make_request(
+              "/api/measures/component",
+              {
+                  "component": project_key,
+                  "metricKeys": (
+                      "coverage,bugs,vulnerabilities,code_smells,security_hotspots,"
+                      "technical_debt,duplicated_lines_density,ncloc,files"
+                  ),
+              },
+          )
+          if metrics_data and "component" in metrics_data:
+              component = metrics_data.get("component", {})
+              for measure in component.get("measures", []):
+                  key = measure.get("metric")
+                  value = measure.get("value")
+                  if value is None:
+                      continue
+                  try:
+                      if key in ["coverage", "duplicated_lines_density"]:
+                          metrics[key] = float(value)
+                      elif key == "technical_debt":
+                          # SonarQube returns technical debt in minutes
+                          minutes = int(value)
+                          hours = minutes // 60
+                          mins = minutes % 60
+                          if hours > 0:
+                              metrics[key] = f"{hours}h {mins}min"
+                          else:
+                              metrics[key] = f"{mins}min"
+                      else:
+                          metrics[key] = int(value)
+                  except Exception:
+                      metrics[key] = value
+          
+          # Fetch quality gate status
+          quality_gate = {"status": "UNKNOWN"}
+          qg_data = make_request(
+              "/api/qualitygates/project_status",
+              {"projectKey": project_key},
+          )
+          if qg_data and "projectStatus" in qg_data:
+              ps = qg_data.get("projectStatus", {})
+              quality_gate = {
+                  "status": ps.get("status", "UNKNOWN"),
+                  "conditions": ps.get("conditions", []),
+              }
+          
+          # Count issues by severity (Sonar severities: BLOCKER, CRITICAL, MAJOR, MINOR, INFO)
+          severity_counts = {
+              "BLOCKER": 0,
+              "CRITICAL": 0,
+              "MAJOR": 0,
+              "MINOR": 0,
+              "INFO": 0,
+          }
+          for issue in all_issues:
+              sev = issue.get("severity", "INFO")
+              if sev in severity_counts:
+                  severity_counts[sev] += 1
+          
+          # Map severities into critical/high/medium/low/info buckets
+          critical = severity_counts.get("CRITICAL", 0) + severity_counts.get("BLOCKER", 0)
+          high = severity_counts.get("MAJOR", 0)
+          medium = severity_counts.get("MINOR", 0)
+          low = severity_counts.get("INFO", 0)
+          info = low
+          
+          # Sort and trim issues: most severe and newest first
+          severity_rank = {"BLOCKER": 0, "CRITICAL": 1, "MAJOR": 2, "MINOR": 3, "INFO": 4}
+          def issue_sort_key(i):
+              sev = i.get("severity", "INFO")
+              created = i.get("creationDate", "")
+              return (severity_rank.get(sev, 5), created)
+          
+          all_issues.sort(key=issue_sort_key)
+          MAX_ISSUES = 200
+          trimmed_issues = []
+          for issue in all_issues[:MAX_ISSUES]:
+              item = {
+                  "key": issue.get("key"),
+                  "severity": issue.get("severity"),
+                  "type": issue.get("type"),
+                  "component": issue.get("component"),
+                  "line": issue.get("line"),
+                  "message": issue.get("message"),
+                  "rule": issue.get("rule"),
+                  "status": issue.get("status"),
+                  "author": issue.get("author"),
+                  "creation_date": issue.get("creationDate"),
+                  "update_date": issue.get("updateDate"),
+                  "text_range": issue.get("textRange"),
+                  "flows": issue.get("flows", []),
+                  "tags": issue.get("tags", []),
+              }
+              # Truncate long messages
+              if item["message"] and len(item["message"]) > 400:
+                  item["message"] = item["message"][:400] + "..."
+              trimmed_issues.append(item)
+          
+          results = {
+              "status": "completed",
+              "project_key": project_key,
+              "scan_timestamp": datetime.utcnow().isoformat(),
+              "critical": critical,
+              "high": high,
+              "medium": medium,
+              "low": low,
+              "info": info,
+              "total": len(all_issues),
+              "issues": trimmed_issues,
+              "issues_truncated": len(all_issues) > MAX_ISSUES,
+              "issues_total_count": len(all_issues),
+              "metrics": metrics,
+              "quality_gate": quality_gate,
+          }
+          
+          print(
+              f"SonarQube summary - critical={critical}, high={high}, "
+              f"medium={medium}, low={low}, total={len(all_issues)}, "
+              f"quality_gate={quality_gate.get('status')}"
+          )
+          
+          with open("sonar-parsed.json", "w") as f:
+              json.dump(results, f)
+          
+          payload = {
+              "commit_hash": commit_hash,
+              "branch": branch,
+              "status": results.get("status", "completed"),
+              "results": results,
+          }
+          
+          with open("sonar-payload.json", "w") as f:
+              json.dump(payload, f)
+          
+          print("Wrote sonar-parsed.json and sonar-payload.json")
+          PYEOF
       
       - name: Skip SonarQube Scan
         if: steps.check_sonar.outputs.configured == 'false'
@@ -356,22 +572,23 @@ jobs:
           fi
       
       - name: Send SonarQube Results to Dashboard
-        if: always() && steps.check_sonar.outputs.configured == 'true' && steps.check_dashboard.outputs.configured == 'true'
+        if: always() && steps.check_sonar.outputs.configured == 'true' && steps.check_dashboard.outputs.configured == 'true' && steps.parse_sonar.outcome != 'failure'
         run: |
+          if [ ! -f sonar-payload.json ]; then
+            echo "⚠️ sonar-payload.json not found, skipping SonarQube webhook payload"
+            exit 0
+          fi
+          
+          echo "Sending SonarQube results to Sentinal dashboard..."
+          ls -la sonar-payload.json || true
+          echo "Payload preview (first 500 chars):"
+          head -c 500 sonar-payload.json || true
+          echo ""
+          
           curl -X POST "${{ secrets.SENTINAL_API_URL }}/api/cicd/webhook/sonarqube" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.SENTINAL_API_TOKEN }}" \
-            -d "{
-              \"commit_hash\": \"${{ github.sha }}\",
-              \"branch\": \"${{ github.ref_name }}\",
-              \"status\": \"${{ job.status == 'success' && 'completed' || 'failed' }}\",
-              \"results\": {
-                \"status\": \"${{ job.status == 'success' && 'completed' || 'failed' }}\",
-                \"scan_type\": \"sonarqube\",
-                \"commit\": \"${{ github.sha }}\",
-                \"branch\": \"${{ github.ref_name }}\"
-              }
-            }" || echo "⚠️ Failed to send results to dashboard"
+            -d @sonar-payload.json || echo "⚠️ Failed to send results to dashboard"
       
       - name: Skip Dashboard Webhook
         if: steps.check_dashboard.outputs.configured == 'false'
@@ -381,7 +598,7 @@ jobs:
           echo "1. Set SENTINAL_API_URL secret (e.g., https://your-ngrok-url.ngrok.io)"
           echo "2. Set SENTINAL_API_TOKEN secret (create API token in Sentinal dashboard)"
           echo "3. See README for ngrok setup instructions"
-
+      
   container-scan:
     name: Container Scan (Trivy)
     runs-on: ubuntu-latest

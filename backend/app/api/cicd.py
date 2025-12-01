@@ -174,17 +174,37 @@ class CICDWebhook(Resource):
 
         try:
             if scan_type == "sonarqube":
-                # For SonarQube we don't rely on the minimal CI payload.
-                # Instead, fetch full results directly from SonarQube so the
-                # dashboard and detailed views have rich data (issues, metrics, etc.).
-                scanner = SecurityScanner()
-                full_results = scanner.run_sast_scan(commit_hash)
-                run.sast_results = full_results
-                emit_scan_update(
-                    run.id,
-                    "sast_progress",
-                    {"status": full_results.get("status", status), "results": full_results},
-                )
+                # Prefer parsed results from CI if available (contains status and issue counts)
+                # This avoids duplicate SonarQube API calls and uses CI-parsed data
+                if (
+                    scan_results
+                    and isinstance(scan_results, dict)
+                    and scan_results.get("status")
+                    and (
+                        "critical" in scan_results
+                        or "high" in scan_results
+                        or "total" in scan_results
+                        or "issues" in scan_results
+                    )
+                ):
+                    # Use CI-parsed results directly
+                    run.sast_results = scan_results
+                    emit_scan_update(
+                        run.id,
+                        "sast_progress",
+                        {"status": scan_results.get("status", status), "results": scan_results},
+                    )
+                else:
+                    # Fallback: fetch full results directly from SonarQube for old/minimal payloads
+                    # This maintains backwards compatibility
+                    scanner = SecurityScanner()
+                    full_results = scanner.run_sast_scan(commit_hash)
+                    run.sast_results = full_results
+                    emit_scan_update(
+                        run.id,
+                        "sast_progress",
+                        {"status": full_results.get("status", status), "results": full_results},
+                    )
 
             elif scan_type == "zap":
                 run.dast_results = scan_results
