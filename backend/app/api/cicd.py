@@ -149,6 +149,17 @@ class CICDWebhook(Resource):
         """
         data = request.json or {}
 
+        # Debug: Log raw payload structure (without full content to avoid log spam)
+        if data:
+            payload_preview = {
+                "commit_hash": data.get("commit_hash"),
+                "branch": data.get("branch"),
+                "status": data.get("status"),
+                "has_results": bool(data.get("results")),
+                "results_keys": list(data.get("results", {}).keys()) if isinstance(data.get("results"), dict) else None,
+            }
+            current_app.logger.info(f"Raw webhook payload preview: {payload_preview}")
+
         # Get run info from webhook payload
         commit_hash = data.get("commit_hash") or data.get("sha") or "unknown"
         branch = data.get("branch") or data.get("ref", "main").replace("refs/heads/", "")
@@ -172,11 +183,33 @@ class CICDWebhook(Resource):
         scan_results = data.get("results", {})
         status = data.get("status", "completed")
 
+        # Debug logging for webhook payload
+        current_app.logger.info(
+            f"Webhook received for {scan_type}: "
+            f"commit_hash={commit_hash}, branch={branch}, "
+            f"status={status}, "
+            f"has_results={bool(scan_results)}, "
+            f"results_type={type(scan_results)}, "
+            f"results_keys={list(scan_results.keys()) if isinstance(scan_results, dict) else 'N/A'}"
+        )
+
         try:
             if scan_type == "sonarqube":
                 # Use CI-parsed results directly (same pattern as Trivy/ZAP)
-                # If results are provided, use them; otherwise fall back to fetching from SonarQube
-                if scan_results and isinstance(scan_results, dict):
+                # Check if we have valid CI-parsed results (must have status and at least one data field)
+                has_valid_results = (
+                    scan_results
+                    and isinstance(scan_results, dict)
+                    and (
+                        "status" in scan_results
+                        or "critical" in scan_results
+                        or "high" in scan_results
+                        or "total" in scan_results
+                        or "issues" in scan_results
+                    )
+                )
+
+                if has_valid_results:
                     # Use CI-parsed results directly - matches Trivy/ZAP pattern
                     # Ensure status is always "completed" for CI webhooks (they're sent after scan completes)
                     scan_results["status"] = "completed"
@@ -185,7 +218,7 @@ class CICDWebhook(Resource):
 
                     # Debug logging
                     current_app.logger.info(
-                        f"Storing SonarQube results for run {run.id}: "
+                        f"✅ Storing CI-parsed SonarQube results for run {run.id}: "
                         f"critical={scan_results.get('critical', 0)}, "
                         f"high={scan_results.get('high', 0)}, "
                         f"total={scan_results.get('total', 0)}, "
@@ -203,17 +236,37 @@ class CICDWebhook(Resource):
                     # Fallback: fetch full results directly from SonarQube for old/minimal payloads
                     # This maintains backwards compatibility
                     current_app.logger.warning(
-                        f"SonarQube webhook received minimal payload, fetching from SonarQube API. "
-                        f"scan_results keys: {list(scan_results.keys()) if scan_results else 'None'}"
+                        f"⚠️ SonarQube webhook received minimal/invalid payload, fetching from SonarQube API. "
+                        f"scan_results type: {type(scan_results)}, "
+                        f"scan_results keys: {list(scan_results.keys()) if isinstance(scan_results, dict) else 'N/A'}"
                     )
-                    scanner = SecurityScanner()
-                    full_results = scanner.run_sast_scan(commit_hash)
-                    run.sast_results = full_results
-                    emit_scan_update(
-                        run.id,
-                        "sast_progress",
-                        {"status": full_results.get("status", status), "results": full_results},
-                    )
+                    try:
+                        scanner = SecurityScanner()
+                        full_results = scanner.run_sast_scan(commit_hash)
+                        run.sast_results = full_results
+                        current_app.logger.info(
+                            f"✅ Fetched SonarQube results from API for run {run.id}: "
+                            f"status={full_results.get('status')}, "
+                            f"critical={full_results.get('critical', 0)}"
+                        )
+                        emit_scan_update(
+                            run.id,
+                            "sast_progress",
+                            {"status": full_results.get("status", status), "results": full_results},
+                        )
+                    except Exception as e:
+                        current_app.logger.error(f"❌ Failed to fetch SonarQube results from API: {str(e)}")
+                        # Store error state
+                        run.sast_results = {
+                            "status": "failed",
+                            "error": str(e),
+                            "critical": 0,
+                            "high": 0,
+                            "medium": 0,
+                            "low": 0,
+                            "total": 0,
+                            "issues": [],
+                        }
 
             elif scan_type == "zap":
                 run.dast_results = scan_results
