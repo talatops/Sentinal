@@ -750,7 +750,22 @@ Add the following secrets (one at a time):
 - **Value:** (The token you generated in SonarQube UI)
 - **Description:** SonarQube authentication token
 
-#### 2.5: GitHub OAuth (Optional - if using GitHub OAuth)
+#### 2.5: SonarQube Project Key & Properties
+
+- **Project key used in CI:** `sentinal`
+- The repository root now contains `sonar-project.properties` with the following important fields:
+  - `sonar.projectKey=sentinal`
+  - `sonar.projectName=Sentinal`
+  - `sonar.sources=backend,frontend`
+  - `sonar.python.coverage.reportPaths=backend/coverage.xml`
+- **What to do:**
+  1. In your SonarQube UI (`https://sonarqube.jurassiq-dev.org`), create or confirm a project whose key matches `sentinal`.
+  2. Ensure the token stored in `SONARQUBE_TOKEN` has *Execute Analysis* rights on that project.
+  3. If you ever rename the project, you MUST update both the SonarQube project key and the `sonar-project.properties` file (otherwise CI will fail with `sonar.projectKey` errors).
+
+This properties file is what the GitHub Actions `sast` job reads, so no additional CLI flags are required—just keep the file in sync with the SonarQube project.
+
+#### 2.6: GitHub OAuth (Optional - if using GitHub OAuth)
 
 - **Name:** `GITHUB_CLIENT_ID`
 - **Value:** (Your GitHub OAuth Client ID)

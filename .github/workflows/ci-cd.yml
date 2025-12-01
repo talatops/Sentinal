@@ -323,6 +323,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONARQUBE_URL }}
           SONAR_PROJECT_KEY: sentinal
+          
 
         continue-on-error: true
 
