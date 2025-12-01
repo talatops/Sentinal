@@ -178,3 +178,149 @@ def information_disclosure_example():
     # SonarQube should flag this as a security hotspot
     error_message = f"Database error: Connection failed to {hardcoded_secret_example()['db_password']}"  # noqa: S105
     return error_message
+
+
+def xml_external_entity_injection():
+    """INTENTIONAL: XXE (XML External Entity) injection vulnerability."""
+    # SonarQube should flag this as a security vulnerability
+    import xml.etree.ElementTree as ET
+
+    xml_data = """<?xml version="1.0"?>
+    <!DOCTYPE foo [
+    <!ENTITY xxe SYSTEM "file:///etc/passwd">
+    ]>
+    <foo>&xxe;</foo>"""
+    root = ET.fromstring(xml_data)  # noqa: S405
+    return root.text
+
+
+def server_side_request_forgery(url):
+    """INTENTIONAL: SSRF (Server-Side Request Forgery) vulnerability."""
+    # SonarQube should flag this as a security vulnerability
+    import urllib.request
+
+    response = urllib.request.urlopen(url)  # noqa: S310
+    return response.read()
+
+
+def insecure_cookie_example():
+    """INTENTIONAL: Insecure cookie configuration."""
+    # SonarQube should flag missing secure/httpOnly flags
+    cookie_value = "session_id=abc123"  # noqa: S108
+    return cookie_value
+
+
+def timing_attack_vulnerability(password, stored_hash):
+    """INTENTIONAL: Timing attack vulnerability in password comparison."""
+    # SonarQube should flag this - use constant-time comparison
+    computed_hash = hashlib.sha256(password.encode()).hexdigest()
+    if computed_hash == stored_hash:  # noqa: S105
+        return True
+    return False
+
+
+def insecure_file_permissions(filename):
+    """INTENTIONAL: Insecure file permissions."""
+    # SonarQube should flag this as a security hotspot
+    os.chmod(filename, 0o777)  # noqa: S103
+    return "Permissions changed"
+
+
+def use_of_deprecated_crypto():
+    """INTENTIONAL: Use of deprecated cryptographic functions."""
+    # SonarQube should flag SHA1 as deprecated
+    import hashlib
+
+    hash_value = hashlib.sha1(b"test").hexdigest()  # noqa: S324
+    return hash_value
+
+
+def regex_dos_vulnerability(pattern, text):
+    """INTENTIONAL: ReDoS (Regular Expression Denial of Service) vulnerability."""
+    # SonarQube should flag potentially dangerous regex patterns
+    import re
+
+    match = re.search(pattern, text)  # noqa: S108
+    return match.group() if match else None
+
+
+def insecure_temp_file():
+    """INTENTIONAL: Insecure temporary file creation."""
+    # SonarQube should flag this - use tempfile module instead
+    temp_file = "/tmp/insecure_file.txt"  # noqa: S108
+    with open(temp_file, "w") as f:
+        f.write("data")
+    return temp_file
+
+
+def code_injection_via_template(user_input):
+    """INTENTIONAL: Code injection via template rendering."""
+    # SonarQube should flag this as a security vulnerability
+    template = f"Hello {user_input}"  # noqa: S703
+    # In real scenarios, this could be Jinja2 or similar template injection
+    return template
+
+
+def insecure_password_storage(password):
+    """INTENTIONAL: Insecure password storage - plain text."""
+    # SonarQube should flag storing passwords in plain text
+    stored_password = password  # noqa: S105
+    return stored_password
+
+
+def missing_csrf_protection():
+    """INTENTIONAL: Missing CSRF protection indicator."""
+    # SonarQube may flag this as a security hotspot
+    form_action = "/submit"  # Missing CSRF token
+    return form_action
+
+
+def insecure_redirect(url):
+    """INTENTIONAL: Insecure redirect vulnerability."""
+    # SonarQube should flag unvalidated redirects
+    redirect_url = url  # noqa: S108
+    return redirect_url
+
+
+def buffer_overflow_risk(size):
+    """INTENTIONAL: Potential buffer overflow risk."""
+    # SonarQube should flag this as a security hotspot
+    buffer = bytearray(size)  # No bounds checking
+    return buffer
+
+
+def insecure_session_management():
+    """INTENTIONAL: Insecure session management."""
+    # SonarQube should flag predictable session IDs
+    session_id = str(random.randint(1, 1000))  # noqa: S311
+    return session_id
+
+
+def missing_authentication_check():
+    """INTENTIONAL: Missing authentication check."""
+    # SonarQube should flag this as a security hotspot
+    user_role = "admin"  # No actual authentication performed
+    return user_role
+
+
+def insecure_http_usage():
+    """INTENTIONAL: Insecure HTTP usage instead of HTTPS."""
+    # SonarQube should flag HTTP URLs
+    api_url = "http://api.example.com/data"  # noqa: S105
+    return api_url
+
+
+def weak_encryption_key():
+    """INTENTIONAL: Weak encryption key."""
+    # SonarQube should flag short/weak keys
+    encryption_key = "12345"  # noqa: S105
+    return encryption_key
+
+
+def insecure_logging(sensitive_data):
+    """INTENTIONAL: Logging sensitive information."""
+    # SonarQube should flag logging of sensitive data
+    import logging
+
+    logging.info(f"User data: {sensitive_data}")  # noqa: S108
+    return "Logged"

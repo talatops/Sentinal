@@ -259,7 +259,7 @@ class CICDWebhook(Resource):
                 "run_id": run.id,
                 "status": run.status,
             }
-            
+
             # Include result summary if available
             if scan_type == "sonarqube" and run.sast_results:
                 response_data["sast_summary"] = {
@@ -268,7 +268,7 @@ class CICDWebhook(Resource):
                     "medium": run.sast_results.get("medium", 0),
                     "total": run.sast_results.get("total", 0),
                 }
-            
+
             return response_data, 200
 
         except Exception as e:
