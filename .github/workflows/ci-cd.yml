@@ -392,9 +392,15 @@ jobs:
         with:
           context: ./backend
           push: false
+          load: true
           tags: sentinal-backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify image exists
+        run: |
+          docker images | grep sentinal-backend || echo "Warning: Image not found"
+          docker inspect sentinal-backend:latest || exit 1
 
       - name: Run Trivy vulnerability scanner
         id: trivy
