@@ -1,27 +1,55 @@
-"""Intentional code smells for SonarQube demo.
+"""Intentional SonarQube demo issues.
 
-This module is not used by the application runtime. It only exists so
-SonarQube can detect some simple issues (unused code, unused parameters,
-redundant branches, etc.) for demonstration and testing of the
-Sentinel CI/CD dashboard integration.
+This module is NOT used by the application at runtime.
+It only exists so SonarQube has a few easy findings to
+show in dashboards and so we can verify the Sentinel
+integration end‑to‑end.
 """
 
 
-def _unused_helper(a, b, c):
-    """This function is never called on purpose."""
-    # SonarQube should flag this as unused code.
-    result = a + b + c
-    return result
+def _dead_code_example(x, y):
+    """Completely unused function (dead code)."""
+    # SonarQube should flag this as unused code / dead code
+    total = x + y
+    total += 1  # pointless operation
+    return total
 
 
-def calculate_score(value, unused_param):  # noqa: ARG002
-    """Calculate a score in an intentionally silly way.
+def format_user_v1(name, email):
+    """First version of a formatter."""
+    return f"User: {name} <{email}>"
 
-    - `unused_param` is never used (SonarQube will flag unused parameter).
-    - The if/else branches both return 10, which is redundant.
+
+def format_user_v2(name, email):
+    """Intentional duplicate of v1 so SonarQube detects duplication."""
+    # The body is intentionally identical to format_user_v1
+    return f"User: {name} <{email}>"
+
+
+def noisy_score(value, unused_flag=False):  # noqa: ARG002
+    """Overly complex and noisy logic just for SonarQube.
+
+    - `unused_flag` is never used (unused parameter)
+    - the branching is redundant and could be simplified
     """
-    if value > 10:
-        return 10
+    score = 0
+    if value > 0:
+        if value > 10:
+            score = 10
+        else:
+            score = 5
     else:
-        # This branch is redundant but intentionally left as-is
+        if value == 0:
+            score = 0
+        else:
+            score = -1
+
+    # Redundant re-mapping of score (code smell)
+    if score == 10:
         return 10
+    elif score == 5:
+        return 5
+    elif score == 0:
+        return 0
+    else:
+        return -1
