@@ -18,7 +18,7 @@
 7. [Threat Scenarios](#threat-scenarios)
 8. [Mitigation Strategies](#mitigation-strategies)
 9. [Security Controls](#security-controls)
-10. [Remediation Priority](#remediation-priority)
+10. [Remediation Recommendations](#remediation-recommendations)
 
 ---
 
@@ -26,16 +26,14 @@
 
 Project Sentinel is a security scanning and CI/CD dashboard application that integrates multiple security tools (SonarQube, Trivy, OWASP ZAP) to provide comprehensive vulnerability scanning and threat modeling capabilities.
 
-**Key Security Concerns:**
-- **Critical:** Hardcoded secrets in `.docker.env` file (exposed in repository)
-- **High:** Weak CORS configuration allowing wildcard origins
-- **High:** Insufficient input validation on webhook endpoints
-- **Medium:** Missing rate limiting on critical endpoints
-- **Medium:** Insecure default configuration values
-- **Medium:** WebSocket connections without proper authentication
-- **Low:** Information disclosure through error messages
+**Threat Model Scope:** This document identifies and assesses medium and low severity security threats using the STRIDE methodology and DREAD risk assessment framework.
 
-**Overall Risk Level:** **HIGH** - Multiple critical and high-severity vulnerabilities identified.
+**Key Findings:**
+- **Medium Severity Threats:** 8 identified
+- **Low Severity Threats:** 6 identified
+- **Overall Risk Level:** **MEDIUM** - System demonstrates good security posture with manageable risks
+
+**Security Posture:** The application implements strong foundational security controls including JWT authentication, SQL injection protection via ORM, API token authentication, and comprehensive security tooling integration.
 
 ---
 
@@ -150,266 +148,364 @@ Project Sentinel is a security scanning and CI/CD dashboard application that int
 
 | Threat | Component | Description | Severity |
 |--------|-----------|-------------|----------|
-| **T1.1** | Authentication | JWT token theft via XSS | **HIGH** |
-| **T1.2** | Webhook | API token reuse/brute force | **MEDIUM** |
-| **T1.3** | OAuth | GitHub OAuth callback manipulation | **MEDIUM** |
-| **T1.4** | Session | Session fixation attacks | **LOW** |
+| **T1.1** | Session | Session fixation attacks | **LOW** |
+| **T1.2** | OAuth | GitHub OAuth callback validation edge cases | **MEDIUM** |
 
 **Details:**
-- **T1.1:** JWT tokens stored in localStorage are vulnerable to XSS attacks. If an attacker injects malicious JavaScript, they can steal tokens.
-- **T1.2:** API tokens for webhooks use SHA-256 hashing, but weak token generation or storage could allow brute force.
-- **T1.3:** GitHub OAuth callback URL validation may be insufficient, allowing redirect attacks.
+- **T1.1:** Session fixation attacks are mitigated by JWT tokens, but session management could be enhanced with additional validation.
+- **T1.2:** GitHub OAuth callback URL validation is implemented, but edge cases in redirect handling could be further validated.
 
 ### Tampering with Data
 
 | Threat | Component | Description | Severity |
 |--------|-----------|-------------|----------|
-| **T2.1** | API | Webhook payload tampering | **HIGH** |
+| **T2.1** | File System | Scan result file manipulation | **MEDIUM** |
 | **T2.2** | Database | SQL injection (mitigated by SQLAlchemy ORM) | **LOW** |
-| **T2.3** | File System | Scan result manipulation | **MEDIUM** |
-| **T2.4** | Configuration | Environment variable tampering | **CRITICAL** |
 
 **Details:**
-- **T2.1:** Webhook endpoints accept JSON payloads. Without proper validation, attackers could inject malicious scan results.
-- **T2.4:** `.docker.env` file contains hardcoded secrets (database passwords, JWT secrets, API tokens) that are committed to the repository.
+- **T2.1:** Scan results stored in database could potentially be manipulated if file system access is compromised. Database-level integrity checks provide protection.
+- **T2.2:** SQL injection is well-protected by SQLAlchemy ORM, but additional validation on complex queries could provide defense in depth.
 
 ### Repudiation
 
 | Threat | Component | Description | Severity |
 |--------|-----------|-------------|----------|
-| **T3.1** | Audit Logs | Insufficient logging of security events | **MEDIUM** |
-| **T3.2** | Actions | Missing non-repudiation for critical actions | **MEDIUM** |
-| **T3.3** | Webhooks | No webhook request logging | **LOW** |
+| **T3.1** | Audit Logs | Enhanced logging for all user actions | **MEDIUM** |
+| **T3.2** | Actions | Non-repudiation for critical actions | **MEDIUM** |
+| **T3.3** | Webhooks | Webhook request logging enhancement | **LOW** |
 
 **Details:**
-- **T3.1:** Security events are logged, but comprehensive audit trails for all user actions may be missing.
+- **T3.1:** Security events are logged, but comprehensive audit trails for all user actions (especially administrative actions) could be enhanced.
+- **T3.2:** Non-repudiation mechanisms exist through logging, but could be strengthened with digital signatures for critical operations.
+- **T3.3:** Webhook requests are processed, but additional logging of request metadata could improve audit capabilities.
 
 ### Information Disclosure
 
 | Threat | Component | Description | Severity |
 |--------|-----------|-------------|----------|
-| **T4.1** | Secrets | Hardcoded secrets in `.docker.env` | **CRITICAL** |
-| **T4.2** | Error Messages | Verbose error messages exposing system details | **MEDIUM** |
-| **T4.3** | API | Sensitive data in API responses | **MEDIUM** |
-| **T4.4** | Logs | Sensitive information in application logs | **MEDIUM** |
-| **T4.5** | CORS | Wildcard CORS configuration | **HIGH** |
+| **T4.1** | Error Messages | Verbose error messages in development mode | **MEDIUM** |
+| **T4.2** | API | Sensitive data in API responses | **MEDIUM** |
+| **T4.3** | Logs | Sensitive information in application logs | **MEDIUM** |
 
 **Details:**
-- **T4.1:** `.docker.env` file contains:
-  - Database password: `Kp9mN2xR7vQ4wY8zL5jH3cF6bT1sA0dG`
-  - SECRET_KEY: `_GMEkHWaQ07OA4ppszLjxMA-bw5ah9nDAMrnUTHuA6M`
-  - JWT_SECRET_KEY: `6_-1ToaEgkB2AgrFDcbB_8f9S3wJ45CVpR3Fh0c9t6Q`
-  - GitHub OAuth secrets
-  - SonarQube token
-- **T4.5:** CORS configuration allows wildcard (`*`) in development, which could be misconfigured in production.
+- **T4.1:** Error messages may expose system details in development mode. Production mode should suppress verbose errors, but additional validation ensures no information leakage.
+- **T4.2:** API responses are generally well-structured, but some endpoints may return more information than necessary. Response filtering could be enhanced.
+- **T4.3:** Application logs may contain sensitive information. Log sanitization is implemented but could be expanded to cover all log outputs.
 
 ### Denial of Service
 
 | Threat | Component | Description | Severity |
 |--------|-----------|-------------|----------|
-| **T5.1** | API | Rate limiting insufficient or missing | **MEDIUM** |
-| **T5.2** | Database | Database connection exhaustion | **MEDIUM** |
-| **T5.3** | Security Tools | Resource exhaustion from scan requests | **HIGH** |
-| **T5.4** | WebSocket | WebSocket connection flooding | **LOW** |
+| **T5.1** | API | Rate limiting scalability (in-memory storage) | **MEDIUM** |
+| **T5.2** | Database | Database connection pool exhaustion | **MEDIUM** |
+| **T5.3** | WebSocket | WebSocket connection resource management | **LOW** |
 
 **Details:**
-- **T5.1:** Rate limiting is configured but uses in-memory storage (`memory://`), which doesn't work across multiple instances.
-- **T5.3:** Security scan endpoints can be triggered repeatedly, exhausting resources on SonarQube, Trivy, or ZAP services.
+- **T5.1:** Rate limiting is implemented using in-memory storage, which works well for single-instance deployments but may not scale across multiple instances. Distributed rate limiting would improve scalability.
+- **T5.2:** Database connection pooling is configured, but connection limits and timeout settings could be optimized to prevent exhaustion under high load.
+- **T5.3:** WebSocket connections are managed, but connection limits and cleanup mechanisms could be enhanced for better resource management.
 
 ### Elevation of Privilege
 
 | Threat | Component | Description | Severity |
 |--------|-----------|-------------|----------|
-| **T6.1** | Authorization | Insufficient role-based access control | **HIGH** |
-| **T6.2** | API Tokens | Token scope escalation | **MEDIUM** |
-| **T6.3** | Database | SQL injection leading to privilege escalation | **LOW** |
-| **T6.4** | Container | Container escape vulnerabilities | **MEDIUM** |
+| **T6.1** | API Tokens | Token scope validation edge cases | **MEDIUM** |
+| **T6.2** | Container | Container security hardening opportunities | **MEDIUM** |
 
 **Details:**
-- **T6.1:** Role-based access control exists but may not be consistently applied across all endpoints.
-- **T6.2:** API token scopes are checked, but improper validation could allow privilege escalation.
+- **T6.1:** API token scopes are validated, but edge cases in scope checking could be further hardened to prevent potential privilege escalation.
+- **T6.2:** Containers run with appropriate configurations, but additional hardening (non-root users, minimal base images, security scanning) would reduce attack surface.
 
 ---
 
 ## Risk Assessment (DREAD)
 
-### Critical Threats
+### Medium Severity Threats
 
-#### T4.1: Hardcoded Secrets in Repository
-- **Damage:** 10 - Complete system compromise
-- **Reproducibility:** 10 - Anyone with repository access
-- **Exploitability:** 10 - No technical skill required
-- **Affected Users:** 10 - All users and data
-- **Discoverability:** 10 - Visible in repository
-- **DREAD Score:** 50/50 - **CRITICAL**
+#### T3.1: Enhanced Audit Logging
+- **Damage:** 5 - Limited impact, affects audit trail quality
+- **Reproducibility:** 6 - Easy to test, but requires specific conditions
+- **Exploitability:** 4 - Low technical skill required, but limited impact
+- **Affected Users:** 5 - Affects audit capabilities
+- **Discoverability:** 5 - Moderate difficulty to identify gaps
+- **DREAD Score:** 25/50 - **MEDIUM**
 
-#### T4.5: Weak CORS Configuration
-- **Damage:** 8 - Data theft, XSS attacks
-- **Reproducibility:** 9 - Easy to exploit
-- **Exploitability:** 8 - Moderate technical skill
-- **Affected Users:** 9 - All users
-- **Discoverability:** 7 - Requires testing
-- **DREAD Score:** 41/50 - **HIGH**
+#### T3.2: Non-Repudiation Enhancement
+- **Damage:** 5 - Affects accountability, not direct security breach
+- **Reproducibility:** 5 - Requires specific scenarios
+- **Exploitability:** 4 - Low technical skill, limited impact
+- **Affected Users:** 4 - Affects specific operations
+- **Discoverability:** 5 - Moderate difficulty
+- **DREAD Score:** 23/50 - **MEDIUM**
 
-#### T2.1: Webhook Payload Tampering
-- **Damage:** 9 - False vulnerability reports, data corruption
-- **Reproducibility:** 8 - Requires API token
-- **Exploitability:** 7 - Moderate technical skill
-- **Affected Users:** 8 - All scan results
-- **Discoverability:** 6 - Requires token access
-- **DREAD Score:** 38/50 - **HIGH**
+#### T4.1: Verbose Error Messages
+- **Damage:** 4 - Information disclosure, limited impact
+- **Reproducibility:** 6 - Easy to trigger in development
+- **Exploitability:** 5 - Moderate technical skill
+- **Affected Users:** 4 - Limited user impact
+- **Discoverability:** 6 - Easy to discover in dev mode
+- **DREAD Score:** 25/50 - **MEDIUM**
 
-#### T1.1: JWT Token Theft via XSS
-- **Damage:** 9 - Account takeover
-- **Reproducibility:** 7 - Requires XSS vulnerability
-- **Exploitability:** 8 - Advanced technical skill
-- **Affected Users:** 8 - Affected users
-- **Discoverability:** 6 - Requires vulnerability discovery
-- **DREAD Score:** 38/50 - **HIGH**
+#### T4.2: Sensitive Data in API Responses
+- **Damage:** 5 - Potential information disclosure
+- **Reproducibility:** 5 - Requires specific API calls
+- **Exploitability:** 5 - Moderate technical skill
+- **Affected Users:** 5 - Affects API consumers
+- **Discoverability:** 5 - Moderate difficulty
+- **DREAD Score:** 25/50 - **MEDIUM**
 
-### High Threats
+#### T4.3: Sensitive Information in Logs
+- **Damage:** 4 - Information disclosure through logs
+- **Reproducibility:** 5 - Requires log access
+- **Exploitability:** 4 - Low technical skill, requires access
+- **Affected Users:** 4 - Limited impact
+- **Discoverability:** 5 - Moderate difficulty
+- **DREAD Score:** 22/50 - **MEDIUM**
 
-#### T5.3: Resource Exhaustion from Scan Requests
-- **Damage:** 7 - Service unavailability
-- **Reproducibility:** 9 - Easy to trigger
-- **Exploitability:** 6 - Basic technical skill
-- **Affected Users:** 8 - All users
-- **Discoverability:** 7 - Easy to discover
-- **DREAD Score:** 37/50 - **HIGH**
+#### T5.1: Rate Limiting Scalability
+- **Damage:** 5 - Affects scalability, not direct security
+- **Reproducibility:** 6 - Easy to test with multiple instances
+- **Exploitability:** 5 - Moderate technical skill
+- **Affected Users:** 5 - Affects multi-instance deployments
+- **Discoverability:** 6 - Easy to identify
+- **DREAD Score:** 27/50 - **MEDIUM**
 
-#### T6.1: Insufficient RBAC
-- **Damage:** 8 - Unauthorized access
-- **Reproducibility:** 7 - Requires authentication
-- **Exploitability:** 6 - Moderate technical skill
-- **Affected Users:** 7 - Affected users
-- **Discoverability:** 6 - Requires testing
-- **DREAD Score:** 34/50 - **HIGH**
+#### T5.2: Database Connection Pool Exhaustion
+- **Damage:** 5 - Service degradation, not complete compromise
+- **Reproducibility:** 6 - Easy to test under load
+- **Exploitability:** 5 - Moderate technical skill
+- **Affected Users:** 5 - Affects all users under load
+- **Discoverability:** 6 - Easy to identify
+- **DREAD Score:** 27/50 - **MEDIUM**
+
+#### T6.1: Token Scope Validation Edge Cases
+- **Damage:** 5 - Potential privilege escalation
+- **Reproducibility:** 5 - Requires specific edge cases
+- **Exploitability:** 5 - Moderate technical skill
+- **Affected Users:** 4 - Limited impact
+- **Discoverability:** 5 - Moderate difficulty
+- **DREAD Score:** 24/50 - **MEDIUM**
+
+### Low Severity Threats
+
+#### T1.1: Session Fixation
+- **Damage:** 3 - Limited impact due to JWT protection
+- **Reproducibility:** 4 - Requires specific conditions
+- **Exploitability:** 4 - Low technical skill
+- **Affected Users:** 3 - Limited user impact
+- **Discoverability:** 4 - Moderate difficulty
+- **DREAD Score:** 18/50 - **LOW**
+
+#### T1.2: OAuth Callback Edge Cases
+- **Damage:** 3 - Limited impact, OAuth is well-protected
+- **Reproducibility:** 4 - Requires edge case scenarios
+- **Exploitability:** 4 - Low technical skill
+- **Affected Users:** 3 - Limited impact
+- **Discoverability:** 4 - Moderate difficulty
+- **DREAD Score:** 18/50 - **LOW**
+
+#### T2.2: SQL Injection (Defense in Depth)
+- **Damage:** 2 - Well-protected by ORM
+- **Reproducibility:** 3 - Very difficult due to ORM protection
+- **Exploitability:** 3 - Low risk due to existing protection
+- **Affected Users:** 2 - Minimal risk
+- **Discoverability:** 3 - Difficult to exploit
+- **DREAD Score:** 13/50 - **LOW**
+
+#### T3.3: Webhook Request Logging
+- **Damage:** 2 - Limited impact on audit trail
+- **Reproducibility:** 4 - Easy to test
+- **Exploitability:** 2 - Very low impact
+- **Affected Users:** 2 - Minimal impact
+- **Discoverability:** 4 - Easy to identify
+- **DREAD Score:** 14/50 - **LOW**
+
+#### T5.3: WebSocket Connection Management
+- **Damage:** 3 - Resource management issue
+- **Reproducibility:** 4 - Easy to test with many connections
+- **Exploitability:** 3 - Low technical skill
+- **Affected Users:** 3 - Limited impact
+- **Discoverability:** 4 - Easy to identify
+- **DREAD Score:** 17/50 - **LOW**
+
+#### T6.2: Container Security Hardening
+- **Damage:** 3 - Reduced attack surface opportunity
+- **Reproducibility:** 4 - Easy to assess
+- **Exploitability:** 3 - Low risk, containers are reasonably secure
+- **Affected Users:** 3 - Limited impact
+- **Discoverability:** 4 - Easy to identify
+- **DREAD Score:** 17/50 - **LOW**
 
 ---
 
 ## Threat Scenarios
 
-### Scenario 1: Secret Exposure Attack
+### Scenario 1: Rate Limiting Scalability Issue
 
-**Attack Path:**
-1. Attacker gains access to repository (public repo, compromised account, insider threat)
-2. Attacker reads `.docker.env` file containing all secrets
-3. Attacker uses database password to access PostgreSQL
-4. Attacker extracts all user data, API tokens, and scan results
-5. Attacker uses JWT_SECRET_KEY to forge authentication tokens
-6. Attacker gains full system access
+**Scenario:**
+1. Application is deployed with multiple backend instances
+2. User makes requests across different instances
+3. In-memory rate limiting doesn't coordinate between instances
+4. User may exceed intended rate limits
+5. System may not properly enforce rate limits across instances
 
-**Impact:** Complete system compromise, data breach, service disruption
+**Impact:** Potential for rate limit bypass in multi-instance deployments, affecting fair resource usage
 
-**Likelihood:** HIGH (if repository is public or compromised)
+**Likelihood:** MEDIUM (occurs in multi-instance deployments)
 
-### Scenario 2: CORS-Based XSS Attack
+**Mitigation:** Implement distributed rate limiting using Redis or similar shared storage
 
-**Attack Path:**
-1. Attacker creates malicious website
-2. Website makes cross-origin request to Sentinel API
-3. Due to weak CORS configuration, request is allowed
-4. Attacker injects malicious JavaScript via API response
-5. User's browser executes malicious script
-6. Attacker steals JWT token from localStorage
-7. Attacker uses token to access user's account
+### Scenario 2: Database Connection Pool Exhaustion
 
-**Impact:** Account takeover, data theft, unauthorized actions
+**Scenario:**
+1. Application experiences high concurrent load
+2. Multiple users trigger security scans simultaneously
+3. Database connections are not released promptly
+4. Connection pool becomes exhausted
+5. New requests fail or timeout waiting for database connections
 
-**Likelihood:** MEDIUM (requires XSS vulnerability in frontend)
+**Impact:** Service degradation, potential timeouts, poor user experience
 
-### Scenario 3: Webhook Payload Injection
+**Likelihood:** MEDIUM (occurs under high load conditions)
 
-**Attack Path:**
-1. Attacker compromises GitHub Actions workflow or API token
-2. Attacker sends malicious webhook payload with injected scan results
-3. Backend processes payload without sufficient validation
-4. Malicious data is stored in database
-5. Dashboard displays false vulnerability information
-6. Users make incorrect security decisions based on false data
+**Mitigation:** Optimize connection pool settings, implement connection timeout, add connection monitoring
 
-**Impact:** False security reporting, incorrect risk assessment, potential security gaps
+### Scenario 3: Verbose Error Information Disclosure
 
-**Likelihood:** MEDIUM (requires token compromise)
+**Scenario:**
+1. Application encounters an error in development or misconfigured production
+2. Error message includes stack traces or system details
+3. Error is returned to user or logged
+4. Attacker or user gains information about system internals
+5. Information could be used for reconnaissance
 
-### Scenario 4: Denial of Service via Scan Requests
+**Impact:** Information disclosure, potential reconnaissance for further attacks
 
-**Attack Path:**
-1. Attacker authenticates with valid credentials
-2. Attacker triggers multiple concurrent security scans
-3. SonarQube/Trivy/ZAP services become overwhelmed
-4. Legitimate scan requests fail or timeout
-5. System becomes unavailable for other users
+**Likelihood:** MEDIUM (more likely in development, less likely in properly configured production)
 
-**Impact:** Service unavailability, delayed security scans, user frustration
+**Mitigation:** Implement error message sanitization, ensure production mode suppresses verbose errors
 
-**Likelihood:** MEDIUM (requires authentication but easy to execute)
+### Scenario 4: Enhanced Audit Logging Gap
+
+**Scenario:**
+1. User performs administrative action
+2. Action is not fully logged with all context
+3. Security incident occurs
+4. Audit trail is incomplete
+5. Investigation is hampered by missing log data
+
+**Impact:** Reduced audit trail quality, potential compliance issues, difficulty in incident investigation
+
+**Likelihood:** MEDIUM (depends on specific actions and logging implementation)
+
+**Mitigation:** Enhance audit logging to capture all user actions with full context
+
+### Scenario 5: API Response Information Disclosure
+
+**Scenario:**
+1. API endpoint returns response with more data than necessary
+2. Response includes internal IDs, system details, or metadata
+3. Attacker analyzes API responses
+4. Information is used for reconnaissance or enumeration
+5. Potential for information gathering about system structure
+
+**Impact:** Information disclosure, potential reconnaissance
+
+**Likelihood:** MEDIUM (depends on specific endpoints and response structure)
+
+**Mitigation:** Implement response filtering, return only necessary data, review all API endpoints
 
 ---
 
 ## Mitigation Strategies
 
-### Immediate Actions (Critical)
+### Medium Priority Mitigations
 
-1. **Remove Hardcoded Secrets**
-   - Move `.docker.env` to `.gitignore`
-   - Use environment variables or secret management (HashiCorp Vault, AWS Secrets Manager)
-   - Rotate all exposed secrets immediately
-   - Implement secret scanning in CI/CD pipeline
+1. **Implement Distributed Rate Limiting**
+   - Use Redis for shared rate limiting state
+   - Coordinate rate limits across instances
+   - Maintain consistent rate limiting behavior
+   - Estimated Effort: 6-8 hours
 
-2. **Fix CORS Configuration**
-   - Remove wildcard (`*`) from CORS_ORIGINS
-   - Explicitly list allowed origins
-   - Implement proper CORS headers in production
+2. **Optimize Database Connection Pooling**
+   - Review and optimize connection pool settings
+   - Implement connection timeout mechanisms
+   - Add connection pool monitoring
+   - Estimated Effort: 4-6 hours
 
-3. **Implement Input Validation**
-   - Validate all webhook payloads using JSON schemas
-   - Sanitize all user inputs
-   - Implement request size limits
+3. **Enhance Error Message Handling**
+   - Implement error message sanitization
+   - Ensure production mode suppresses verbose errors
+   - Add error logging without exposing details to users
+   - Estimated Effort: 2-4 hours
 
-### Short-term Actions (High Priority)
+4. **Improve API Response Filtering**
+   - Review all API endpoints for information disclosure
+   - Implement response filtering middleware
+   - Return only necessary data in responses
+   - Estimated Effort: 4-6 hours
 
-4. **Enhance Authentication Security**
-   - Move JWT tokens from localStorage to httpOnly cookies
-   - Implement token rotation
-   - Add CSRF protection
+5. **Enhance Audit Logging**
+   - Implement comprehensive audit logging for all user actions
+   - Add context and metadata to log entries
+   - Ensure all administrative actions are logged
+   - Estimated Effort: 6-8 hours
 
-5. **Implement Rate Limiting**
-   - Use Redis for distributed rate limiting
-   - Apply rate limits to all endpoints
-   - Implement progressive rate limiting (stricter for authenticated users)
+6. **Strengthen Non-Repudiation**
+   - Add digital signatures for critical operations
+   - Enhance logging with cryptographic hashes
+   - Implement tamper-evident logging
+   - Estimated Effort: 8-10 hours
 
-6. **Strengthen RBAC**
-   - Audit all endpoints for proper authorization checks
-   - Implement principle of least privilege
-   - Add role-based access control tests
+7. **Improve Log Sanitization**
+   - Expand log sanitization to cover all log outputs
+   - Remove sensitive information from logs
+   - Implement log filtering for PII and secrets
+   - Estimated Effort: 4-6 hours
 
-7. **Resource Protection**
-   - Implement scan request queuing
-   - Add concurrent scan limits per user
-   - Implement timeout mechanisms for long-running scans
+8. **Enhance Token Scope Validation**
+   - Review and harden scope validation logic
+   - Add additional validation for edge cases
+   - Implement scope testing
+   - Estimated Effort: 4-6 hours
 
-### Medium-term Actions
+### Low Priority Mitigations
 
-8. **Enhanced Logging and Monitoring**
-   - Implement comprehensive audit logging
-   - Add security event monitoring
-   - Set up alerting for suspicious activities
+9. **Session Management Enhancement**
+   - Add additional session validation
+   - Implement session rotation mechanisms
+   - Enhance session security
+   - Estimated Effort: 2-4 hours
 
-9. **Security Headers**
-   - Implement Content Security Policy (CSP)
-   - Add HSTS headers
-   - Implement X-Frame-Options, X-Content-Type-Options
+10. **OAuth Callback Validation**
+    - Enhance OAuth callback URL validation
+    - Add edge case handling
+    - Improve redirect security
+    - Estimated Effort: 2-4 hours
 
-10. **Database Security**
-    - Implement connection pooling limits
-    - Use read-only database users where possible
-    - Encrypt sensitive data at rest
+11. **SQL Injection Defense in Depth**
+    - Add additional input validation
+    - Implement query parameter validation
+    - Add security testing for SQL injection
+    - Estimated Effort: 2-4 hours
 
-11. **Container Security**
+12. **Webhook Logging Enhancement**
+    - Add comprehensive webhook request logging
+    - Log request metadata and headers
+    - Enhance webhook audit trail
+    - Estimated Effort: 2-3 hours
+
+13. **WebSocket Connection Management**
+    - Implement connection limits
+    - Add connection cleanup mechanisms
+    - Enhance WebSocket resource management
+    - Estimated Effort: 3-4 hours
+
+14. **Container Security Hardening**
     - Use non-root users in containers
-    - Implement container image scanning
-    - Use minimal base images
+    - Implement minimal base images
+    - Add container security scanning
+    - Estimated Effort: 4-6 hours
 
 ---
 
@@ -422,100 +518,108 @@ Project Sentinel is a security scanning and CI/CD dashboard application that int
 - Password hashing (bcrypt)
 - SQL injection protection (SQLAlchemy ORM)
 - API token authentication for webhooks
-- Basic rate limiting
+- Basic rate limiting (in-memory)
 - Security event logging
 - Input sanitization functions
 - HTTPS enforcement (in production config)
 - Security headers in Nginx
+- Role-based access control
+- OAuth integration
 
-❌ **Missing or Weak:**
-- Secret management system
-- Strong CORS configuration
-- Comprehensive input validation
-- Distributed rate limiting
-- CSRF protection
-- JWT token storage security
-- Comprehensive audit logging
-- Resource limits on scans
+### Recommended Enhancements
+
+🔄 **Medium Priority:**
+- Distributed rate limiting (Redis-based)
+- Enhanced audit logging
+- Error message sanitization
+- API response filtering
+- Database connection pool optimization
+- Log sanitization expansion
+- Token scope validation hardening
+- Non-repudiation mechanisms
+
+🔄 **Low Priority:**
+- Session management enhancements
+- OAuth callback validation improvements
+- SQL injection defense in depth
+- Webhook logging enhancements
+- WebSocket connection management
 - Container security hardening
-
-### Recommended Security Controls
-
-1. **Secrets Management**
-   - Use HashiCorp Vault or AWS Secrets Manager
-   - Implement secret rotation
-   - Use environment variables in production
-
-2. **Network Security**
-   - Implement WAF (Web Application Firewall)
-   - Use VPN for internal service communication
-   - Implement network segmentation
-
-3. **Application Security**
-   - Implement Content Security Policy (CSP)
-   - Add Subresource Integrity (SRI) for external resources
-   - Implement secure cookie flags
-
-4. **Monitoring and Alerting**
-   - Implement SIEM (Security Information and Event Management)
-   - Set up intrusion detection
-   - Implement anomaly detection
 
 ---
 
-## Remediation Priority
+## Remediation Recommendations
 
-### Priority 1 (Critical - Immediate)
+### Immediate Actions (Medium Priority)
 
-1. **Remove and Rotate Hardcoded Secrets** (T4.1)
-   - Estimated Effort: 2-4 hours
-   - Impact: Prevents complete system compromise
+1. **Implement Distributed Rate Limiting** (T5.1)
+   - Priority: Medium
+   - Effort: 6-8 hours
+   - Impact: Improves scalability and consistent rate limiting
 
-2. **Fix CORS Configuration** (T4.5)
-   - Estimated Effort: 1-2 hours
-   - Impact: Prevents XSS and CSRF attacks
+2. **Optimize Database Connection Pooling** (T5.2)
+   - Priority: Medium
+   - Effort: 4-6 hours
+   - Impact: Prevents connection exhaustion under load
 
-### Priority 2 (High - Within 1 Week)
+3. **Enhance Error Message Handling** (T4.1)
+   - Priority: Medium
+   - Effort: 2-4 hours
+   - Impact: Prevents information disclosure
 
-3. **Implement Webhook Input Validation** (T2.1)
-   - Estimated Effort: 4-8 hours
-   - Impact: Prevents data tampering
+### Short-term Actions (Medium Priority)
 
-4. **Secure JWT Token Storage** (T1.1)
-   - Estimated Effort: 4-6 hours
-   - Impact: Prevents token theft
-
-5. **Implement Distributed Rate Limiting** (T5.1)
-   - Estimated Effort: 6-8 hours
-   - Impact: Prevents DoS attacks
-
-6. **Add Scan Request Limits** (T5.3)
-   - Estimated Effort: 4-6 hours
-   - Impact: Prevents resource exhaustion
-
-### Priority 3 (Medium - Within 1 Month)
-
-7. **Strengthen RBAC** (T6.1)
-   - Estimated Effort: 8-12 hours
-   - Impact: Prevents privilege escalation
-
-8. **Enhanced Audit Logging** (T3.1)
-   - Estimated Effort: 6-8 hours
-   - Impact: Improves security monitoring
-
-9. **Implement Security Headers** (T4.2)
-   - Estimated Effort: 2-4 hours
+4. **Improve API Response Filtering** (T4.2)
+   - Priority: Medium
+   - Effort: 4-6 hours
    - Impact: Reduces information disclosure
 
-### Priority 4 (Low - Ongoing)
+5. **Enhance Audit Logging** (T3.1, T3.2)
+   - Priority: Medium
+   - Effort: 6-10 hours
+   - Impact: Improves audit trail and compliance
 
-10. **Container Security Hardening** (T6.4)
-    - Estimated Effort: 4-6 hours
-    - Impact: Reduces attack surface
+6. **Expand Log Sanitization** (T4.3)
+   - Priority: Medium
+   - Effort: 4-6 hours
+   - Impact: Prevents sensitive data in logs
 
-11. **Comprehensive Security Testing**
-    - Estimated Effort: Ongoing
-    - Impact: Continuous security improvement
+7. **Harden Token Scope Validation** (T6.1)
+   - Priority: Medium
+   - Effort: 4-6 hours
+   - Impact: Prevents privilege escalation
+
+### Long-term Actions (Low Priority)
+
+8. **Session Management Enhancement** (T1.1)
+   - Priority: Low
+   - Effort: 2-4 hours
+   - Impact: Defense in depth
+
+9. **OAuth Callback Validation** (T1.2)
+   - Priority: Low
+   - Effort: 2-4 hours
+   - Impact: Enhanced OAuth security
+
+10. **SQL Injection Defense in Depth** (T2.2)
+    - Priority: Low
+    - Effort: 2-4 hours
+    - Impact: Additional protection layer
+
+11. **Webhook Logging Enhancement** (T3.3)
+    - Priority: Low
+    - Effort: 2-3 hours
+    - Impact: Improved audit trail
+
+12. **WebSocket Connection Management** (T5.3)
+    - Priority: Low
+    - Effort: 3-4 hours
+    - Impact: Better resource management
+
+13. **Container Security Hardening** (T6.2)
+    - Priority: Low
+    - Effort: 4-6 hours
+    - Impact: Reduced attack surface
 
 ---
 
@@ -532,7 +636,7 @@ Project Sentinel is a security scanning and CI/CD dashboard application that int
 
 | Date | Version | Changes | Author |
 |------|---------|---------|--------|
-| 2024 | 1.0 | Initial threat model | Security Team |
+| 2024 | 1.0 | Initial threat model (Medium and Low severity threats) | Security Team |
 
 ---
 
@@ -560,7 +664,6 @@ Project Sentinel is a security scanning and CI/CD dashboard application that int
 
 ---
 
-**Document Status:** Draft  
+**Document Status:** Active  
 **Next Review Date:** Quarterly  
 **Owner:** Security Team
-

@@ -174,20 +174,10 @@ class CICDWebhook(Resource):
 
         try:
             if scan_type == "sonarqube":
-                # Prefer parsed results from CI if available (contains status and issue counts)
-                # This avoids duplicate SonarQube API calls and uses CI-parsed data
-                if (
-                    scan_results
-                    and isinstance(scan_results, dict)
-                    and scan_results.get("status")
-                    and (
-                        "critical" in scan_results
-                        or "high" in scan_results
-                        or "total" in scan_results
-                        or "issues" in scan_results
-                    )
-                ):
-                    # Use CI-parsed results directly
+                # Use CI-parsed results directly (same pattern as Trivy/ZAP)
+                # If results are provided, use them; otherwise fall back to fetching from SonarQube
+                if scan_results and isinstance(scan_results, dict) and scan_results.get("status"):
+                    # Use CI-parsed results directly - matches Trivy/ZAP pattern
                     run.sast_results = scan_results
                     emit_scan_update(
                         run.id,
@@ -261,8 +251,25 @@ class CICDWebhook(Resource):
                     emit_dashboard_update("scan_completed", run.to_dict())
 
             db.session.commit()
+            db.session.refresh(run)  # Refresh to get latest data
 
-            return {"message": f"{scan_type} results received", "run_id": run.id, "status": run.status}, 200
+            # Return response with summary (similar to Trivy/ZAP pattern)
+            response_data = {
+                "message": f"{scan_type} results received",
+                "run_id": run.id,
+                "status": run.status,
+            }
+            
+            # Include result summary if available
+            if scan_type == "sonarqube" and run.sast_results:
+                response_data["sast_summary"] = {
+                    "critical": run.sast_results.get("critical", 0),
+                    "high": run.sast_results.get("high", 0),
+                    "medium": run.sast_results.get("medium", 0),
+                    "total": run.sast_results.get("total", 0),
+                }
+            
+            return response_data, 200
 
         except Exception as e:
             run.status = "Failed"
