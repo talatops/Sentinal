@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
 env:
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '20'
@@ -402,8 +407,8 @@ jobs:
           docker images | grep sentinal-backend || echo "Warning: Image not found"
           docker inspect sentinal-backend:latest || exit 1
 
-      - name: Run Trivy vulnerability scanner
-        id: trivy
+      - name: Run Trivy vulnerability scanner (SARIF)
+        id: trivy_sarif
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'image'
@@ -412,11 +417,104 @@ jobs:
           output: 'trivy-results.sarif'
         continue-on-error: true
       
+      - name: Run Trivy vulnerability scanner (JSON)
+        id: trivy_json
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: 'sentinal-backend:latest'
+          format: 'json'
+          output: 'trivy-results.json'
+        continue-on-error: true
+      
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
+      
+      - name: Parse Trivy JSON results
+        id: parse_trivy
+        if: always() && steps.trivy_json.outcome != 'failure'
+        run: |
+          python3 << 'PYEOF'
+          import json
+          import os
+          
+          counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
+          total = 0
+          
+          if os.path.exists('trivy-results.json'):
+              try:
+                  with open('trivy-results.json', 'r') as f:
+                      data = json.load(f)
+                  
+                  results = data.get("Results", [])
+                  for result in results:
+                      vulns = result.get("Vulnerabilities", [])
+                      total += len(vulns)
+                      for vuln in vulns:
+                          severity = vuln.get("Severity", "UNKNOWN")
+                          if severity in counts:
+                              counts[severity] += 1
+                  
+                  # Parse vulnerabilities into structured format
+                  vulnerabilities = []
+                  for result in results:
+                      result_type = result.get("Type", "")
+                      for vuln in result.get("Vulnerabilities", []):
+                          parsed_vuln = {
+                              "vulnerability_id": vuln.get("VulnerabilityID"),
+                              "pkg_name": vuln.get("PkgName"),
+                              "pkg_path": vuln.get("PkgPath"),
+                              "installed_version": vuln.get("InstalledVersion"),
+                              "fixed_version": vuln.get("FixedVersion"),
+                              "severity": vuln.get("Severity", "UNKNOWN"),
+                              "title": vuln.get("Title"),
+                              "description": vuln.get("Description"),
+                              "published_date": vuln.get("PublishedDate"),
+                              "last_modified_date": vuln.get("LastModifiedDate"),
+                              "cvss": vuln.get("CVSS", {}),
+                              "cwe_ids": vuln.get("CweIDs", []),
+                              "references": vuln.get("References", []),
+                              "primary_url": vuln.get("PrimaryURL"),
+                              "class": "os-pkgs" if result_type == "os" else "lang-pkgs",
+                              "package_type": result_type
+                          }
+                          vulnerabilities.append(parsed_vuln)
+                  
+                  metadata = data.get("Metadata", {})
+                  
+                  # Save parsed results for dashboard (matching backend format)
+                  parsed_data = {
+                      "status": "completed",
+                      "image": "sentinal-backend:latest",
+                      "scan_timestamp": data.get("Metadata", {}).get("RepoDigests", [""])[0] if data.get("Metadata", {}).get("RepoDigests") else "",
+                      "critical": counts["CRITICAL"],
+                      "high": counts["HIGH"],
+                      "medium": counts["MEDIUM"],
+                      "low": counts["LOW"],
+                      "unknown": counts["UNKNOWN"],
+                      "total": total,
+                      "vulnerabilities": vulnerabilities,
+                      "raw_results": data
+                  }
+                  
+                  with open('trivy-parsed.json', 'w') as out:
+                      json.dump(parsed_data, out)
+                  
+              except Exception as e:
+                  print(f"Error parsing Trivy results: {e}", file=os.sys.stderr)
+          
+          # Set GitHub outputs
+          github_output = os.getenv('GITHUB_OUTPUT', '/dev/stdout')
+          with open(github_output, 'a') as f:
+              f.write(f"critical={counts['CRITICAL']}\n")
+              f.write(f"high={counts['HIGH']}\n")
+              f.write(f"medium={counts['MEDIUM']}\n")
+              f.write(f"low={counts['LOW']}\n")
+              f.write(f"total={total}\n")
+          PYEOF
       
       - name: Check Sentinal Dashboard configuration
         id: check_dashboard_trivy
@@ -427,23 +525,63 @@ jobs:
             echo "configured=true" >> $GITHUB_OUTPUT
           fi
       
-      - name: Send Trivy Results to Dashboard
+      - name: Prepare Trivy payload for dashboard
+        id: prepare_payload
         if: always() && steps.check_dashboard_trivy.outputs.configured == 'true'
+        run: |
+          python3 << 'PYEOF'
+          import json
+          import os
+          
+          commit_hash = "${{ github.sha }}"
+          branch = "${{ github.ref_name }}"
+          job_status = "${{ job.status }}"
+          status = "completed" if job_status == "success" else "failed"
+          
+          # Default empty results
+          results = {
+              "status": status,
+              "scan_type": "trivy",
+              "image": "sentinal-backend:latest",
+              "critical": 0,
+              "high": 0,
+              "medium": 0,
+              "low": 0,
+              "unknown": 0,
+              "total": 0
+          }
+          
+          # Load parsed results if available
+          if os.path.exists('trivy-parsed.json'):
+              try:
+                  with open('trivy-parsed.json', 'r') as f:
+                      parsed = json.load(f)
+                      results.update(parsed)
+              except Exception as e:
+                  print(f"Warning: Could not load parsed results: {e}", file=os.sys.stderr)
+          
+          # Create full payload
+          payload = {
+              "commit_hash": commit_hash,
+              "branch": branch,
+              "status": status,
+              "results": results
+          }
+          
+          # Write payload to file for curl
+          with open('trivy-payload.json', 'w') as f:
+              json.dump(payload, f)
+          
+          print(f"Prepared payload with {results.get('total', 0)} vulnerabilities")
+          PYEOF
+      
+      - name: Send Trivy Results to Dashboard
+        if: always() && steps.check_dashboard_trivy.outputs.configured == 'true' && steps.prepare_payload.outcome != 'failure'
         run: |
           curl -X POST "${{ secrets.SENTINAL_API_URL }}/api/cicd/webhook/trivy" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.SENTINAL_API_TOKEN }}" \
-            -d "{
-              \"commit_hash\": \"${{ github.sha }}\",
-              \"branch\": \"${{ github.ref_name }}\",
-              \"status\": \"${{ job.status == 'success' && 'completed' || 'failed' }}\",
-              \"results\": {
-                \"status\": \"${{ job.status == 'success' && 'completed' || 'failed' }}\",
-                \"scan_type\": \"trivy\",
-                \"commit\": \"${{ github.sha }}\",
-                \"branch\": \"${{ github.ref_name }}\"
-              }
-            }" || echo "⚠️ Failed to send results to dashboard"
+            -d @trivy-payload.json || echo "⚠️ Failed to send results to dashboard"
 
   dast:
     name: DAST Scan (OWASP ZAP)
