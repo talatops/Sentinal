@@ -967,8 +967,11 @@ jobs:
                       if a.get("solution") and len(a["solution"]) > 400:
                           a["solution"] = a["solution"][:400] + "..."
                   
+                  # If we successfully parsed results, mark as completed regardless of ZAP exit code
+                  # ZAP exits with non-zero when it finds issues, which is expected behavior
                   parsed.update(
                       {
+                          "status": "completed",  # Scan completed successfully if we have results
                           "critical": counts["Critical"],
                           "high": counts["High"],
                           "medium": counts["Medium"],
@@ -979,6 +982,7 @@ jobs:
                           "scan_end": datetime.utcnow().isoformat(),
                       }
                   )
+                  print(f"✅ Successfully parsed ZAP results: {len(raw_alerts)} alerts found. Scan status: completed")
               except Exception as e:
                   print(f"Error parsing ZAP report from {report_file}: {e}")
           else:
@@ -1017,11 +1021,9 @@ jobs:
           
           commit_hash = "${{ github.sha }}"
           branch = "${{ github.ref_name }}"
-          job_status = "${{ job.status }}"
-          status = "completed" if job_status == "success" else "failed"
           
           results = {
-              "status": status,
+              "status": "failed",  # Default to failed, will be updated if we have parsed results
               "scan_type": "zap",
               "target": "http://localhost",
               "critical": 0,
@@ -1056,14 +1058,29 @@ jobs:
                       if key in parsed:
                           results[key] = parsed[key]
                   
+                  # If we have results (alerts found or scan completed), use the status from parsed results
+                  # This ensures "completed" status even if ZAP exited with non-zero (which is normal when issues are found)
+                  if results.get("total", 0) > 0 or results.get("status") == "completed":
+                      status = "completed"
+                  else:
+                      status = results.get("status", "failed")
+                  
                   # Ensure alerts length is reasonable
                   MAX_ALERTS = 100
                   if isinstance(results.get("alerts"), list) and len(results["alerts"]) > MAX_ALERTS:
                       results["alerts"] = results["alerts"][:MAX_ALERTS]
                   
                   print(f"Prepared ZAP results with {results.get('total', 0)} total alerts")
+                  print(f"Scan status determined from parsed results: {status}")
               except Exception as e:
                   print(f"Warning: could not load zap-parsed.json: {e}")
+                  status = "failed"
+          else:
+              print("No zap-parsed.json found, marking scan as failed")
+              status = "failed"
+          
+          # Ensure results status matches the overall status
+          results["status"] = status
           
           payload = {
               "commit_hash": commit_hash,
