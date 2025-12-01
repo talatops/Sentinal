@@ -299,6 +299,13 @@ jobs:
     name: SAST Scan (SonarQube)
     runs-on: ubuntu-latest
     needs: [smoke-test]
+    outputs:
+      critical: ${{ steps.parse_sonar.outputs.critical || 0 }}
+      high: ${{ steps.parse_sonar.outputs.high || 0 }}
+      medium: ${{ steps.parse_sonar.outputs.medium || 0 }}
+      low: ${{ steps.parse_sonar.outputs.low || 0 }}
+      total: ${{ steps.parse_sonar.outputs.total || 0 }}
+      quality_gate_status: ${{ steps.parse_sonar.outputs.quality_gate_status || 'UNKNOWN' }}
     steps:
       - uses: actions/checkout@v4
       
@@ -546,7 +553,18 @@ jobs:
           with open("sonar-payload.json", "w") as f:
               json.dump(payload, f)
           
+          # Set GitHub outputs for deployment gate
+          github_output = os.getenv("GITHUB_OUTPUT", "/dev/stdout")
+          with open(github_output, "a") as f:
+              f.write(f"critical={critical}\n")
+              f.write(f"high={high}\n")
+              f.write(f"medium={medium}\n")
+              f.write(f"low={low}\n")
+              f.write(f"total={len(all_issues)}\n")
+              f.write(f"quality_gate_status={quality_gate.get('status', 'UNKNOWN')}\n")
+          
           print("Wrote sonar-parsed.json and sonar-payload.json")
+          print(f"Set GitHub outputs: critical={critical}, high={high}, medium={medium}, total={len(all_issues)}")
           PYEOF
       
       - name: Skip SonarQube Scan
@@ -603,6 +621,12 @@ jobs:
     name: Container Scan (Trivy)
     runs-on: ubuntu-latest
     needs: [smoke-test]
+    outputs:
+      critical: ${{ steps.parse_trivy.outputs.critical || 0 }}
+      high: ${{ steps.parse_trivy.outputs.high || 0 }}
+      medium: ${{ steps.parse_trivy.outputs.medium || 0 }}
+      low: ${{ steps.parse_trivy.outputs.low || 0 }}
+      total: ${{ steps.parse_trivy.outputs.total || 0 }}
     steps:
       - uses: actions/checkout@v4
 
@@ -995,6 +1019,13 @@ jobs:
     name: DAST Scan (OWASP ZAP)
     runs-on: ubuntu-latest
     needs: [smoke-test]
+    outputs:
+      critical: ${{ steps.parse_zap.outputs.critical || 0 }}
+      high: ${{ steps.parse_zap.outputs.high || 0 }}
+      medium: ${{ steps.parse_zap.outputs.medium || 0 }}
+      low: ${{ steps.parse_zap.outputs.low || 0 }}
+      informational: ${{ steps.parse_zap.outputs.informational || 0 }}
+      total: ${{ steps.parse_zap.outputs.total || 0 }}
     permissions:
       contents: read
       issues: write
@@ -1329,14 +1360,125 @@ jobs:
     name: Deployment Gate
     runs-on: ubuntu-latest
     needs: [sast, container-scan, dast]
+    env:
+      # Configurable thresholds (set via GitHub secrets or use defaults)
+      MAX_CRITICAL: ${{ secrets.DEPLOYMENT_GATE_MAX_CRITICAL || '0' }}
+      MAX_HIGH: ${{ secrets.DEPLOYMENT_GATE_MAX_HIGH || '10' }}
+      MAX_MEDIUM: ${{ secrets.DEPLOYMENT_GATE_MAX_MEDIUM || '50' }}
+      BLOCK_ON_QUALITY_GATE_FAIL: ${{ secrets.DEPLOYMENT_GATE_BLOCK_ON_QG_FAIL || 'true' }}
     steps:
       - uses: actions/checkout@v4
       
       - name: Check for critical vulnerabilities
         run: |
-          echo "Checking for critical vulnerabilities..."
-          # In production, parse scan results and fail if critical vulnerabilities found
-          echo "No critical vulnerabilities found. Deployment approved."
+          echo "🔍 Deployment Gate: Checking vulnerability thresholds..."
+          echo "Thresholds:"
+          echo "  - Critical: ${{ env.MAX_CRITICAL }}"
+          echo "  - High: ${{ env.MAX_HIGH }}"
+          echo "  - Medium: ${{ env.MAX_MEDIUM }}"
+          echo "  - Block on Quality Gate Fail: ${{ env.BLOCK_ON_QUALITY_GATE_FAIL }}"
+          echo ""
+          
+          # Initialize totals
+          TOTAL_CRITICAL=0
+          TOTAL_HIGH=0
+          TOTAL_MEDIUM=0
+          GATE_FAILED=0
+          
+          # Check SonarQube (SAST) results
+          echo "📊 Checking SonarQube (SAST) results..."
+          if [ "${{ needs.sast.result }}" == "success" ] || [ "${{ needs.sast.result }}" == "failure" ]; then
+            SAST_CRITICAL=${{ needs.sast.outputs.critical || 0 }}
+            SAST_HIGH=${{ needs.sast.outputs.high || 0 }}
+            SAST_MEDIUM=${{ needs.sast.outputs.medium || 0 }}
+            SAST_QG_STATUS="${{ needs.sast.outputs.quality_gate_status || 'UNKNOWN' }}"
+            
+            echo "  SonarQube: Critical=$SAST_CRITICAL, High=$SAST_HIGH, Medium=$SAST_MEDIUM, Quality Gate=$SAST_QG_STATUS"
+            
+            TOTAL_CRITICAL=$((TOTAL_CRITICAL + SAST_CRITICAL))
+            TOTAL_HIGH=$((TOTAL_HIGH + SAST_HIGH))
+            TOTAL_MEDIUM=$((TOTAL_MEDIUM + SAST_MEDIUM))
+            
+            # Check quality gate status
+            if [ "${{ env.BLOCK_ON_QUALITY_GATE_FAIL }}" == "true" ] && [ "$SAST_QG_STATUS" == "FAILED" ]; then
+              echo "  ❌ SonarQube Quality Gate FAILED - blocking deployment"
+              GATE_FAILED=1
+            fi
+          else
+            echo "  ⚠️ SonarQube scan not completed, skipping..."
+          fi
+          
+          # Check Trivy (Container Scan) results
+          echo "📊 Checking Trivy (Container Scan) results..."
+          if [ "${{ needs.container-scan.result }}" == "success" ] || [ "${{ needs.container-scan.result }}" == "failure" ]; then
+            TRIVY_CRITICAL=${{ needs.container-scan.outputs.critical || 0 }}
+            TRIVY_HIGH=${{ needs.container-scan.outputs.high || 0 }}
+            TRIVY_MEDIUM=${{ needs.container-scan.outputs.medium || 0 }}
+            
+            echo "  Trivy: Critical=$TRIVY_CRITICAL, High=$TRIVY_HIGH, Medium=$TRIVY_MEDIUM"
+            
+            TOTAL_CRITICAL=$((TOTAL_CRITICAL + TRIVY_CRITICAL))
+            TOTAL_HIGH=$((TOTAL_HIGH + TRIVY_HIGH))
+            TOTAL_MEDIUM=$((TOTAL_MEDIUM + TRIVY_MEDIUM))
+          else
+            echo "  ⚠️ Trivy scan not completed, skipping..."
+          fi
+          
+          # Check ZAP (DAST) results
+          echo "📊 Checking ZAP (DAST) results..."
+          if [ "${{ needs.dast.result }}" == "success" ] || [ "${{ needs.dast.result }}" == "failure" ]; then
+            ZAP_CRITICAL=${{ needs.dast.outputs.critical || 0 }}
+            ZAP_HIGH=${{ needs.dast.outputs.high || 0 }}
+            ZAP_MEDIUM=${{ needs.dast.outputs.medium || 0 }}
+            
+            echo "  ZAP: Critical=$ZAP_CRITICAL, High=$ZAP_HIGH, Medium=$ZAP_MEDIUM"
+            
+            TOTAL_CRITICAL=$((TOTAL_CRITICAL + ZAP_CRITICAL))
+            TOTAL_HIGH=$((TOTAL_HIGH + ZAP_HIGH))
+            TOTAL_MEDIUM=$((TOTAL_MEDIUM + ZAP_MEDIUM))
+          else
+            echo "  ⚠️ ZAP scan not completed, skipping..."
+          fi
+          
+          echo ""
+          echo "📈 Total Vulnerabilities Across All Scans:"
+          echo "  Critical: $TOTAL_CRITICAL (threshold: ${{ env.MAX_CRITICAL }})"
+          echo "  High: $TOTAL_HIGH (threshold: ${{ env.MAX_HIGH }})"
+          echo "  Medium: $TOTAL_MEDIUM (threshold: ${{ env.MAX_MEDIUM }})"
+          echo ""
+          
+          # Check thresholds
+          DEPLOYMENT_BLOCKED=0
+          
+          if [ "$TOTAL_CRITICAL" -gt "${{ env.MAX_CRITICAL }}" ]; then
+            echo "❌ BLOCKED: Critical vulnerabilities ($TOTAL_CRITICAL) exceed threshold (${{ env.MAX_CRITICAL }})"
+            DEPLOYMENT_BLOCKED=1
+          fi
+          
+          if [ "$TOTAL_HIGH" -gt "${{ env.MAX_HIGH }}" ]; then
+            echo "❌ BLOCKED: High vulnerabilities ($TOTAL_HIGH) exceed threshold (${{ env.MAX_HIGH }})"
+            DEPLOYMENT_BLOCKED=1
+          fi
+          
+          if [ "$TOTAL_MEDIUM" -gt "${{ env.MAX_MEDIUM }}" ]; then
+            echo "❌ BLOCKED: Medium vulnerabilities ($TOTAL_MEDIUM) exceed threshold (${{ env.MAX_MEDIUM }})"
+            DEPLOYMENT_BLOCKED=1
+          fi
+          
+          if [ "$GATE_FAILED" -eq 1 ]; then
+            echo "❌ BLOCKED: Quality Gate failed"
+            DEPLOYMENT_BLOCKED=1
+          fi
+          
+          if [ "$DEPLOYMENT_BLOCKED" -eq 1 ]; then
+            echo ""
+            echo "🚫 Deployment BLOCKED due to security vulnerabilities or quality gate failure"
+            echo "Please review and fix the issues before deploying to production."
+            exit 1
+          else
+            echo "✅ All vulnerability thresholds passed!"
+            echo "✅ Deployment approved - ready for production deployment"
+          fi
       
       - name: Deployment Gate Passed
         if: success()

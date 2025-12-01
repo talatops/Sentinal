@@ -1,6 +1,6 @@
 """CI/CD API endpoints."""
 
-from flask import request
+from flask import request, current_app
 from flask_restful import Resource
 from app.core.security import jwt_required
 from app import db
@@ -176,9 +176,24 @@ class CICDWebhook(Resource):
             if scan_type == "sonarqube":
                 # Use CI-parsed results directly (same pattern as Trivy/ZAP)
                 # If results are provided, use them; otherwise fall back to fetching from SonarQube
-                if scan_results and isinstance(scan_results, dict) and scan_results.get("status"):
+                if scan_results and isinstance(scan_results, dict):
                     # Use CI-parsed results directly - matches Trivy/ZAP pattern
+                    # Ensure status is always "completed" for CI webhooks (they're sent after scan completes)
+                    scan_results["status"] = "completed"
+
                     run.sast_results = scan_results
+
+                    # Debug logging
+                    current_app.logger.info(
+                        f"Storing SonarQube results for run {run.id}: "
+                        f"critical={scan_results.get('critical', 0)}, "
+                        f"high={scan_results.get('high', 0)}, "
+                        f"total={scan_results.get('total', 0)}, "
+                        f"status={scan_results.get('status')}, "
+                        f"has_issues={bool(scan_results.get('issues'))}, "
+                        f"issues_count={len(scan_results.get('issues', []))}"
+                    )
+
                     emit_scan_update(
                         run.id,
                         "sast_progress",
@@ -187,6 +202,10 @@ class CICDWebhook(Resource):
                 else:
                     # Fallback: fetch full results directly from SonarQube for old/minimal payloads
                     # This maintains backwards compatibility
+                    current_app.logger.warning(
+                        f"SonarQube webhook received minimal payload, fetching from SonarQube API. "
+                        f"scan_results keys: {list(scan_results.keys()) if scan_results else 'None'}"
+                    )
                     scanner = SecurityScanner()
                     full_results = scanner.run_sast_scan(commit_hash)
                     run.sast_results = full_results
@@ -491,7 +510,19 @@ class LatestSonarQubeScan(Resource):
         if not run:
             return {"run": None, "sast_results": None, "message": "No SonarQube scans found"}, 200
 
-        return {"run": run.to_dict(), "sast_results": run.sast_results}, 200
+        # Debug logging
+        sast_results = run.sast_results
+        current_app.logger.info(
+            f"LatestSonarQubeScan: run_id={run.id}, "
+            f"has_sast_results={sast_results is not None}, "
+            f"type={type(sast_results)}, "
+            f"keys={list(sast_results.keys()) if isinstance(sast_results, dict) else 'N/A'}, "
+            f"critical={sast_results.get('critical', 0) if isinstance(sast_results, dict) else 'N/A'}, "
+            f"total={sast_results.get('total', 0) if isinstance(sast_results, dict) else 'N/A'}, "
+            f"status={sast_results.get('status', 'N/A') if isinstance(sast_results, dict) else 'N/A'}"
+        )
+
+        return {"run": run.to_dict(), "sast_results": sast_results}, 200
 
 
 class LatestZAPScan(Resource):
