@@ -694,6 +694,11 @@ jobs:
     name: DAST Scan (OWASP ZAP)
     runs-on: ubuntu-latest
     needs: [smoke-test]
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      security-events: write
     steps:
       - uses: actions/checkout@v4
       - name: Create test environment file
@@ -705,7 +710,13 @@ jobs:
           DATABASE_URL=postgresql://test_user:test_password_32_chars_long@postgres:5432/test_sentinal
           SECRET_KEY=test_secret_key_32_characters_long
           JWT_SECRET_KEY=test_jwt_secret_key_32_characters_long
-
+          POSTGRES_HOST=postgres
+          POSTGRES_PORT=5432
+          FLASK_ENV=testing
+          GITHUB_CLIENT_ID=
+          GITHUB_CLIENT_SECRET=
+          SONARQUBE_TOKEN=
+          EOF
       - name: Start application services for ZAP
         run: |
           docker compose --env-file .docker.env up -d postgres backend frontend
@@ -724,7 +735,177 @@ jobs:
         uses: zaproxy/action-baseline@v0.10.0
         with:
           target: 'http://localhost'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          cmd_options: '-J zap_report.json -w zap_report.md -r zap_report.html'
         continue-on-error: true
+      
+      - name: Debug ZAP report files
+        if: always()
+        run: |
+          echo "Listing workspace files after ZAP scan..."
+          ls -la
+          if [ -f zap_report.json ]; then
+            echo "✅ zap_report.json found. First 500 characters:"
+            head -c 500 zap_report.json || true
+            echo ""
+          else
+            echo "❌ zap_report.json not found"
+          fi
+      
+      - name: Parse ZAP JSON results
+        id: parse_zap
+        if: always()
+        env:
+          ZAP_OUTCOME: ${{ steps.zap.outcome }}
+        run: |
+          python3 << 'PYEOF'
+          import json
+          import os
+          from datetime import datetime
+          
+          report_file = "zap_report.json"
+          
+          # Default empty parsed structure
+          parsed = {
+              "status": "failed" if os.environ.get("ZAP_OUTCOME") == "failure" else "completed",
+              "scan_type": "zap",
+              "target": "http://localhost",
+              "critical": 0,
+              "high": 0,
+              "medium": 0,
+              "low": 0,
+              "informational": 0,
+              "total": 0,
+              "alerts": [],
+              "scan_start": datetime.utcnow().isoformat(),
+          }
+          
+          severity_order = ["Critical", "High", "Medium", "Low", "Informational"]
+          severity_rank = {name: idx for idx, name in enumerate(severity_order)}
+          
+          def normalise_risk(risk_str: str) -> str:
+              if not risk_str:
+                  return "Informational"
+              rs = risk_str.strip().lower()
+              if rs.startswith("informational") or rs.startswith("info"):
+                  return "Informational"
+              if rs.startswith("low"):
+                  return "Low"
+              if rs.startswith("medium"):
+                  return "Medium"
+              if rs.startswith("high"):
+                  return "High"
+              if rs.startswith("critical"):
+                  return "Critical"
+              return "Informational"
+          
+          if os.path.exists(report_file):
+              try:
+                  with open(report_file, "r") as f:
+                      data = json.load(f)
+                  
+                  raw_alerts = []
+                  
+                  # ZAP baseline JSON usually has top-level 'site' array
+                  sites = data.get("site") or data.get("sites") or []
+                  if isinstance(sites, dict):
+                      sites = [sites]
+                  
+                  for site in sites:
+                      for alert in site.get("alerts", []):
+                          risk = normalise_risk(alert.get("riskdesc") or alert.get("risk"))
+                          parsed_alert = {
+                              "id": alert.get("pluginid") or alert.get("pluginId"),
+                              "pluginId": alert.get("pluginid") or alert.get("pluginId"),
+                              "name": alert.get("name") or alert.get("alert"),
+                              "risk": risk,
+                              "confidence": alert.get("confidence"),
+                              "cweid": alert.get("cweid"),
+                              "wascid": alert.get("wascid"),
+                              "url": None,
+                              "method": None,
+                              "param": None,
+                              "attack": None,
+                              "evidence": None,
+                              "description": alert.get("desc") or alert.get("description"),
+                              "solution": alert.get("solution"),
+                              "reference": alert.get("reference"),
+                              "other": alert.get("other"),
+                              "alert": alert.get("alert") or alert.get("name"),
+                              "messageId": None,
+                              "sourceid": alert.get("sourceid"),
+                          }
+                          
+                          instances = alert.get("instances") or []
+                          if instances:
+                              inst = instances[0]
+                              parsed_alert["url"] = inst.get("uri")
+                              parsed_alert["method"] = inst.get("method")
+                              parsed_alert["param"] = inst.get("param")
+                              parsed_alert["attack"] = inst.get("attack")
+                              parsed_alert["evidence"] = inst.get("evidence")
+                          
+                          raw_alerts.append(parsed_alert)
+                  
+                  # Compute severity counts
+                  counts = {
+                      "Critical": 0,
+                      "High": 0,
+                      "Medium": 0,
+                      "Low": 0,
+                      "Informational": 0,
+                  }
+                  for a in raw_alerts:
+                      r = a.get("risk") or "Informational"
+                      if r in counts:
+                          counts[r] += 1
+                  
+                  # Sort alerts by severity then url
+                  def sort_key(a):
+                      r = a.get("risk") or "Informational"
+                      return (severity_rank.get(r, len(severity_order)), a.get("url") or "")
+                  
+                  raw_alerts.sort(key=sort_key)
+                  
+                  # Limit to top N alerts for payload size
+                  MAX_ALERTS = 100
+                  alerts = raw_alerts[:MAX_ALERTS]
+                  
+                  # Truncate long text fields
+                  for a in alerts:
+                      if a.get("description") and len(a["description"]) > 600:
+                          a["description"] = a["description"][:600] + "..."
+                      if a.get("solution") and len(a["solution"]) > 400:
+                          a["solution"] = a["solution"][:400] + "..."
+                  
+                  parsed.update(
+                      {
+                          "critical": counts["Critical"],
+                          "high": counts["High"],
+                          "medium": counts["Medium"],
+                          "low": counts["Low"],
+                          "informational": counts["Informational"],
+                          "total": len(raw_alerts),
+                          "alerts": alerts,
+                          "scan_end": datetime.utcnow().isoformat(),
+                      }
+                  )
+              except Exception as e:
+                  print(f"Error parsing ZAP report: {e}")
+          
+          with open("zap-parsed.json", "w") as out_f:
+              json.dump(parsed, out_f)
+          
+          # Also expose simple counts for potential future gates
+          github_output = os.getenv("GITHUB_OUTPUT", "/dev/stdout")
+          with open(github_output, "a") as f:
+              f.write(f"critical={parsed['critical']}\n")
+              f.write(f"high={parsed['high']}\n")
+              f.write(f"medium={parsed['medium']}\n")
+              f.write(f"low={parsed['low']}\n")
+              f.write(f"informational={parsed['informational']}\n")
+              f.write(f"total={parsed['total']}\n")
+          PYEOF
       
       - name: Check Sentinal Dashboard configuration
         id: check_dashboard_zap
@@ -735,23 +916,85 @@ jobs:
             echo "configured=true" >> $GITHUB_OUTPUT
           fi
       
-      - name: Send ZAP Results to Dashboard
+      - name: Prepare ZAP payload for dashboard
+        id: prepare_zap_payload
         if: always() && steps.check_dashboard_zap.outputs.configured == 'true'
+        run: |
+          python3 << 'PYEOF'
+          import json
+          import os
+          
+          commit_hash = "${{ github.sha }}"
+          branch = "${{ github.ref_name }}"
+          job_status = "${{ job.status }}"
+          status = "completed" if job_status == "success" else "failed"
+          
+          results = {
+              "status": status,
+              "scan_type": "zap",
+              "target": "http://localhost",
+              "critical": 0,
+              "high": 0,
+              "medium": 0,
+              "low": 0,
+              "informational": 0,
+              "total": 0,
+              "alerts": [],
+          }
+          
+          if os.path.exists("zap-parsed.json"):
+              try:
+                  with open("zap-parsed.json", "r") as f:
+                      parsed = json.load(f)
+                  
+                  # Merge but avoid unexpected keys blowing up payload
+                  for key in [
+                      "status",
+                      "scan_type",
+                      "target",
+                      "critical",
+                      "high",
+                      "medium",
+                      "low",
+                      "informational",
+                      "total",
+                      "alerts",
+                      "scan_start",
+                      "scan_end",
+                  ]:
+                      if key in parsed:
+                          results[key] = parsed[key]
+                  
+                  # Ensure alerts length is reasonable
+                  MAX_ALERTS = 100
+                  if isinstance(results.get("alerts"), list) and len(results["alerts"]) > MAX_ALERTS:
+                      results["alerts"] = results["alerts"][:MAX_ALERTS]
+                  
+                  print(f"Prepared ZAP results with {results.get('total', 0)} total alerts")
+              except Exception as e:
+                  print(f"Warning: could not load zap-parsed.json: {e}")
+          
+          payload = {
+              "commit_hash": commit_hash,
+              "branch": branch,
+              "status": status,
+              "results": results,
+          }
+          
+          payload_str = json.dumps(payload)
+          print(f"ZAP payload size: {len(payload_str) / 1024:.2f} KB")
+          
+          with open("zap-payload.json", "w") as f:
+              f.write(payload_str)
+          PYEOF
+      
+      - name: Send ZAP Results to Dashboard
+        if: always() && steps.check_dashboard_zap.outputs.configured == 'true' && steps.prepare_zap_payload.outcome != 'failure'
         run: |
           curl -X POST "${{ secrets.SENTINAL_API_URL }}/api/cicd/webhook/zap" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.SENTINAL_API_TOKEN }}" \
-            -d "{
-              \"commit_hash\": \"${{ github.sha }}\",
-              \"branch\": \"${{ github.ref_name }}\",
-              \"status\": \"${{ job.status == 'success' && 'completed' || 'failed' }}\",
-              \"results\": {
-                \"status\": \"${{ job.status == 'success' && 'completed' || 'failed' }}\",
-                \"scan_type\": \"zap\",
-                \"commit\": \"${{ github.sha }}\",
-                \"branch\": \"${{ github.ref_name }}\"
-              }
-            }" || echo "⚠️ Failed to send results to dashboard"
+            -d @zap-payload.json || echo "⚠️ Failed to send results to dashboard"
 
       - name: Cleanup
         run: |
