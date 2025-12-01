@@ -427,6 +427,23 @@ jobs:
           output: 'trivy-results.json'
         continue-on-error: true
       
+      - name: Check Trivy JSON output
+        if: always()
+        run: |
+          if [ -f trivy-results.json ]; then
+            echo "✅ trivy-results.json exists"
+            echo "File size: $(du -h trivy-results.json | cut -f1)"
+            echo "First 500 characters:"
+            head -c 500 trivy-results.json
+            echo ""
+            echo "Checking JSON structure..."
+            python3 -c "import json; data=json.load(open('trivy-results.json')); print(f'Keys: {list(data.keys())}'); print(f'Has Results: {\"Results\" in data}'); print(f'Results count: {len(data.get(\"Results\", []))}')" || echo "JSON structure check failed"
+          else
+            echo "❌ trivy-results.json not found!"
+            echo "Listing files in current directory:"
+            ls -la
+          fi
+      
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
         with:
@@ -446,12 +463,25 @@ jobs:
           
           if os.path.exists('trivy-results.json'):
               try:
+                  print("Reading trivy-results.json...")
                   with open('trivy-results.json', 'r') as f:
                       data = json.load(f)
                   
+                  print(f"Loaded JSON data. Keys: {list(data.keys())}")
+                  
                   results = data.get("Results", [])
+                  print(f"Found {len(results)} results")
+                  
+                  if not results:
+                      # Try alternative structure
+                      if "ArtifactName" in data:
+                          results = [data]
+                          print("Using single result structure")
+                  
                   for result in results:
                       vulns = result.get("Vulnerabilities", [])
+                      if not vulns:
+                          print(f"No vulnerabilities found in result type: {result.get('Type', 'unknown')}")
                       total += len(vulns)
                       for vuln in vulns:
                           severity = vuln.get("Severity", "UNKNOWN")
@@ -486,6 +516,7 @@ jobs:
                   metadata = data.get("Metadata", {})
                   
                   # Save parsed results for dashboard (matching backend format)
+                  # Note: raw_results excluded to reduce payload size
                   parsed_data = {
                       "status": "completed",
                       "image": "sentinal-backend:latest",
@@ -496,15 +527,20 @@ jobs:
                       "low": counts["LOW"],
                       "unknown": counts["UNKNOWN"],
                       "total": total,
-                      "vulnerabilities": vulnerabilities,
-                      "raw_results": data
+                      "vulnerabilities": vulnerabilities
                   }
+                  
+                  print(f"Parsed {total} vulnerabilities: CRITICAL={counts['CRITICAL']}, HIGH={counts['HIGH']}, MEDIUM={counts['MEDIUM']}, LOW={counts['LOW']}")
                   
                   with open('trivy-parsed.json', 'w') as out:
                       json.dump(parsed_data, out)
                   
               except Exception as e:
                   print(f"Error parsing Trivy results: {e}", file=os.sys.stderr)
+                  import traceback
+                  traceback.print_exc()
+          else:
+              print("Warning: trivy-results.json not found. Trivy scan may have failed or output format changed.")
           
           # Set GitHub outputs
           github_output = os.getenv('GITHUB_OUTPUT', '/dev/stdout')
@@ -556,17 +592,88 @@ jobs:
               try:
                   with open('trivy-parsed.json', 'r') as f:
                       parsed = json.load(f)
-                      results.update(parsed)
+                  
+                  # Update results but exclude raw_results and limit vulnerabilities
+                  results.update({
+                      "status": parsed.get("status", status),
+                      "image": parsed.get("image", "sentinal-backend:latest"),
+                      "scan_timestamp": parsed.get("scan_timestamp", ""),
+                      "critical": parsed.get("critical", 0),
+                      "high": parsed.get("high", 0),
+                      "medium": parsed.get("medium", 0),
+                      "low": parsed.get("low", 0),
+                      "unknown": parsed.get("unknown", 0),
+                      "total": parsed.get("total", 0)
+                  })
+                  
+                  # Limit vulnerabilities to first 500 and truncate long fields to reduce payload size
+                  # For webhooks, we primarily send summary stats. Full details can be fetched later if needed
+                  vulnerabilities = parsed.get("vulnerabilities", [])[:500]
+                  for vuln in vulnerabilities:
+                      # Truncate long descriptions
+                      if "description" in vuln and vuln["description"]:
+                          if len(vuln["description"]) > 300:
+                              vuln["description"] = vuln["description"][:300] + "..."
+                      # Limit references to 3
+                      if "references" in vuln and isinstance(vuln["references"], list):
+                          vuln["references"] = vuln["references"][:3]
+                      # Remove large nested objects
+                      if "cvss" in vuln and isinstance(vuln["cvss"], dict):
+                          # Keep only v3 score if available
+                          if "v3" in vuln["cvss"]:
+                              vuln["cvss"] = {"v3": {"score": vuln["cvss"]["v3"].get("score")}}
+                          elif "v2" in vuln["cvss"]:
+                              vuln["cvss"] = {"v2": {"score": vuln["cvss"]["v2"].get("score")}}
+                  
+                  results["vulnerabilities"] = vulnerabilities
+                  
+                  # If we have more vulnerabilities than sent, add a note
+                  if parsed.get("total", 0) > 500:
+                      results["vulnerabilities_truncated"] = True
+                      results["vulnerabilities_total_count"] = parsed.get("total", 0)
+                  
+                  print(f"Loaded parsed results: {results.get('total', 0)} total vulnerabilities")
               except Exception as e:
                   print(f"Warning: Could not load parsed results: {e}", file=os.sys.stderr)
+                  import traceback
+                  traceback.print_exc()
           
-          # Create full payload
+          # Create full payload (exclude raw_results to keep size small)
           payload = {
               "commit_hash": commit_hash,
               "branch": branch,
               "status": status,
               "results": results
           }
+          
+          # Check payload size and optimize if needed
+          import sys
+          payload_size = len(json.dumps(payload))
+          print(f"Payload size: {payload_size / 1024:.2f} KB")
+          
+          # If payload is still too large (>1MB), send only summary without vulnerabilities
+          if payload_size > 1024 * 1024:  # 1MB limit
+              print(f"Payload too large ({payload_size / 1024:.2f} KB). Sending summary only...")
+              summary_only = {
+                  "commit_hash": commit_hash,
+                  "branch": branch,
+                  "status": status,
+                  "results": {
+                      "status": results.get("status", status),
+                      "scan_type": "trivy",
+                      "image": results.get("image", "sentinal-backend:latest"),
+                      "critical": results.get("critical", 0),
+                      "high": results.get("high", 0),
+                      "medium": results.get("medium", 0),
+                      "low": results.get("low", 0),
+                      "unknown": results.get("unknown", 0),
+                      "total": results.get("total", 0),
+                      "vulnerabilities_truncated": True,
+                      "note": "Full vulnerability details available in scan artifacts"
+                  }
+              }
+              payload = summary_only
+              print(f"Optimized payload size: {len(json.dumps(payload)) / 1024:.2f} KB")
           
           # Write payload to file for curl
           with open('trivy-payload.json', 'w') as f:
